@@ -11,6 +11,12 @@ AI Chef es una aplicación educativa que demuestra la integración de la suite m
   - Generación de recetas a partir de imágenes de ingredientes
   - Generación de imágenes del plato terminado con IA
 
+## Screenshots
+
+| Mis Recetas | Generar Receta | Detalle del Plato |
+|:---:|:---:|:---:|
+| <img src="assets/screenshot_list.png" width="250" /> | <img src="assets/screenshot_generator.png" width="250" /> | <img src="assets/screenshot_detail.png" width="250" /> |
+
 ## Arquitectura
 
 ```
@@ -272,29 +278,205 @@ En producción, reemplaza el Debug Provider por **Play Integrity**:
 1. En App Check, registra la app con **Play Integrity**
 2. En el código, usa `PlayIntegrityAppCheckProviderFactory` en lugar de `DebugAppCheckProviderFactory`
 
+## Hilt - Inyección de Dependencias
+
+Este módulo utiliza **Hilt** para inyección de dependencias, a diferencia de los módulos anteriores que usan Koin.
+
+### ¿Por qué Hilt?
+
+| Característica | Hilt | Koin |
+|---------------|------|------|
+| Tipo | Compile-time (anotaciones) | Runtime (DSL Kotlin) |
+| Performance | Más rápido (generación de código) | Más lento (reflexión) |
+| Errores | En compilación | En ejecución |
+| Curva de aprendizaje | Más pronunciada | Más suave |
+| Boilerplate | Más código | Menos código |
+| Soporte Google | Oficial para Android | Comunidad |
+
+> **Nota**: Hilt no se cubrió en el curso pero se incluye como referencia avanzada. Koin es igualmente válido para proyectos profesionales.
+
+### Componentes de Hilt en este Proyecto
+
+```kotlin
+// 1. Application con @HiltAndroidApp
+@HiltAndroidApp
+class AiChefApplication : Application()
+
+// 2. Activity con @AndroidEntryPoint
+@AndroidEntryPoint
+class MainActivity : ComponentActivity()
+
+// 3. ViewModel con @HiltViewModel e @Inject
+@HiltViewModel
+class ChefViewModel @Inject constructor(
+    private val authRepository: IAuthRepository,  // Interfaces, no implementaciones
+    private val firestoreRepository: IFirestoreRepository
+) : ViewModel()
+
+// 4. Module con @Binds para conectar interfaces → implementaciones
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class AppModule {
+    @Binds @Singleton
+    abstract fun bindAuthRepository(impl: AuthRepository): IAuthRepository
+}
+```
+
+### Interfaces para Testabilidad
+
+Todos los repositorios implementan interfaces:
+
+```
+IAuthRepository      ←── AuthRepository
+IFirestoreRepository ←── FirestoreRepository
+IStorageRepository   ←── StorageRepository
+IAiLogicDataSource   ←── AiLogicDataSource
+```
+
+**Beneficios:**
+- Tests unitarios pueden usar mocks/fakes
+- Cambiar implementación sin modificar ViewModel
+- Cumple el principio de Inversión de Dependencias (DIP)
+
+## Unit Tests
+
+El proyecto incluye tests unitarios para demostrar testing con mocks.
+
+### Ejecutar Tests
+
+```bash
+# Todos los tests
+./gradlew test
+
+# Tests específicos
+./gradlew testDebugUnitTest
+
+# Con reporte HTML
+./gradlew test --info
+# Reporte en: app/build/reports/tests/
+```
+
+### Tests Incluidos
+
+| Archivo | Descripción |
+|---------|-------------|
+| `RetryUtilTest.kt` | Tests de exponential backoff |
+| `ChefViewModelTest.kt` | Tests del ViewModel con mocks |
+
+### Librerías de Testing
+
+```kotlin
+// MockK - Mocking para Kotlin
+testImplementation("io.mockk:mockk:1.13.13")
+
+// Coroutines Test - Testing de suspend functions
+testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+// Turbine - Testing de Flows
+testImplementation("app.cash.turbine:turbine:1.2.0")
+```
+
+### Ejemplo de Test con MockK
+
+```kotlin
+@Test
+fun `signIn updates state on success`() = runTest {
+    // Given
+    coEvery { authRepository.signIn(any(), any()) } returns Result.success("user-id")
+
+    // When
+    viewModel.signIn("test@example.com", "password")
+    advanceUntilIdle()
+
+    // Then
+    assertTrue(viewModel.authUiState.value is UiState.Success)
+    coVerify { authRepository.signIn("test@example.com", "password") }
+}
+```
+
+## Retry con Exponential Backoff
+
+Las llamadas a la API de Gemini pueden fallar temporalmente. El proyecto incluye un utility para reintentos:
+
+```kotlin
+// Uso básico
+val result = retryWithExponentialBackoff(
+    maxRetries = 3,
+    initialDelayMs = 1000L,
+    factor = 2.0,
+    maxDelayMs = 10000L
+) {
+    aiLogicDataSource.generateRecipeFromImage(bitmap)
+}
+
+// Solo errores de red
+val result = retryOnNetworkError(maxRetries = 3) {
+    apiCall()
+}
+```
+
+**Patrón de delays:**
+```
+Intento 1: Falla → Espera 1s
+Intento 2: Falla → Espera 2s
+Intento 3: Falla → Espera 4s
+Intento 4: Falla → Espera 8s (capped a maxDelay)
+```
+
+Ver `util/RetryUtil.kt` para documentación completa.
+
+## Constantes de Imagen
+
+Las constantes para procesamiento de imágenes están centralizadas en `util/ImageConstants.kt`:
+
+```kotlin
+object ImageConstants {
+    const val MAX_IMAGE_DIMENSION = 1024  // Máximo px para Gemini
+    const val JPEG_QUALITY = 85           // Balance calidad/tamaño
+    const val MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024  // 4MB
+}
+```
+
+**¿Por qué 1024px?**
+- Gemini puede procesar imágenes más grandes, pero:
+  - Mayor tamaño = Mayor tiempo de procesamiento
+  - Mayor tamaño = Mayor consumo de datos
+  - 1024px es suficiente para identificar ingredientes
+
 ## Estructura del Proyecto
 
 ```
 app/src/main/java/com/curso/android/module5/aichef/
-├── AiChefApplication.kt          # Application class
-├── MainActivity.kt               # Activity + Navigation
+├── AiChefApplication.kt          # @HiltAndroidApp + AppCheck
+├── MainActivity.kt               # @AndroidEntryPoint + Navigation
+│
+├── di/
+│   └── AppModule.kt              # Hilt Module con @Binds
 │
 ├── data/
 │   ├── remote/
+│   │   ├── IAiLogicDataSource.kt # Interface
 │   │   └── AiLogicDataSource.kt  # Firebase AI Logic (Gemini)
 │   └── firebase/
+│       ├── IAuthRepository.kt    # Interface
 │       ├── AuthRepository.kt     # Firebase Auth wrapper
+│       ├── IFirestoreRepository.kt # Interface
 │       ├── FirestoreRepository.kt # Firestore wrapper
-│       └── StorageRepository.kt  # Firebase Storage (cache de imágenes)
+│       ├── IStorageRepository.kt # Interface
+│       └── StorageRepository.kt  # Firebase Storage
 │
 ├── domain/
 │   └── model/
 │       ├── Recipe.kt             # Modelo de receta
-│       └── UiState.kt            # Estados de UI (Loading/Success/Error)
+│       └── UiState.kt            # Estados de UI
+│
+├── util/
+│   ├── RetryUtil.kt              # Exponential backoff
+│   └── ImageConstants.kt         # Constantes de imagen
 │
 └── ui/
     ├── viewmodel/
-    │   └── ChefViewModel.kt      # ViewModel principal
+    │   └── ChefViewModel.kt      # @HiltViewModel
     ├── screens/
     │   ├── AuthScreen.kt         # Login/Registro
     │   ├── HomeScreen.kt         # Lista de recetas
@@ -302,6 +484,12 @@ app/src/main/java/com/curso/android/module5/aichef/
     │   └── RecipeDetailScreen.kt # Detalle + imagen generada
     └── theme/
         └── Theme.kt              # Material 3 Theme
+
+app/src/test/java/com/curso/android/module5/aichef/
+├── viewmodel/
+│   └── ChefViewModelTest.kt      # Tests del ViewModel
+└── util/
+    └── RetryUtilTest.kt          # Tests de RetryUtil
 ```
 
 ## Firebase AI Logic - Conceptos Clave
@@ -401,6 +589,16 @@ implementation("com.google.firebase:firebase-ai")
 
 // Coil para carga de imágenes desde URLs
 implementation("io.coil-kt:coil-compose:2.7.0")
+
+// Hilt - Inyección de Dependencias
+implementation("com.google.dagger:hilt-android:2.51.1")
+kapt("com.google.dagger:hilt-compiler:2.51.1")
+implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+// Testing
+testImplementation("io.mockk:mockk:1.13.13")
+testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+testImplementation("app.cash.turbine:turbine:1.2.0")
 
 // NO USAR:
 // - com.google.firebase:firebase-vertexai (legacy/renombrado)
@@ -504,6 +702,11 @@ La app implementa un sistema de cache para las imágenes generadas por IA:
 - [x] Vista detalle de receta con todos los pasos
 - [x] Generación de imagen del plato terminado con IA
 - [x] Cache de imágenes generadas en Firebase Storage
+- [x] Hilt para inyección de dependencias
+- [x] Interfaces para testabilidad
+- [x] Unit tests con MockK y Turbine
+- [x] Retry con exponential backoff
+- [x] Constantes centralizadas para imágenes
 - [ ] Edición de recetas generadas
 - [ ] Compartir recetas
 - [ ] Historial de imágenes analizadas
