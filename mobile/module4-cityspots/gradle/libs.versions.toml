@@ -140,8 +140,8 @@ koin-bom = { group = "io.insert-koin", name = "koin-bom", version.ref = "koinBom
 # Koin para Android (incluye soporte para ViewModel)
 koin-android = { group = "io.insert-koin", name = "koin-android" }
 
-# Koin para Compose (incluye koinViewModel() para obtener ViewModels)
-koin-compose = { group = "io.insert-koin", name = "koin-compose" }
+# Koin para Compose con AndroidX (incluye koinViewModel() para obtener ViewModels)
+koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -199,5 +199,5 @@ maps = [
 # Bundle de Koin (DI)
 koin = [
     "koin-android",
-    "koin-compose"
+    "koin-androidx-compose"
 ]

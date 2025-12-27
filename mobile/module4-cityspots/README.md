@@ -196,42 +196,72 @@ La librería `maps-compose` provee Composables declarativos:
 ```kotlin
 GoogleMap(
     cameraPositionState = cameraPositionState,
-    properties = MapProperties(isMyLocationEnabled = true)
+    properties = MapProperties(isMyLocationEnabled = true),
+    onMapClick = { selectedSpot = null } // Deseleccionar al tocar el mapa
 ) {
     spots.forEach { spot ->
-        MarkerInfoWindowContent(
+        Marker(
             state = rememberMarkerState(position = LatLng(spot.lat, spot.lng)),
-            title = spot.title
-        ) {
-            // InfoWindow personalizado con imagen y detalles
-            SpotInfoWindow(spot = spot)
+            title = spot.title,
+            onClick = {
+                selectedSpot = spot
+                true // Consumir el click
+            }
+        )
+    }
+}
+```
+
+### 3. Card Flotante como alternativa a InfoWindow
+
+> **Nota**: Originalmente se usaba `MarkerInfoWindowContent` para mostrar contenido Compose en el InfoWindow nativo. Sin embargo, esto tiene problemas de timing porque el InfoWindow se renderiza como un bitmap estático, y si la imagen no está lista, el bitmap queda vacío.
+
+**Solución**: Usar `Marker` básico + Card flotante personalizada:
+
+```kotlin
+// Estado para el spot seleccionado
+var selectedSpot by remember { mutableStateOf<SpotEntity?>(null) }
+
+Box {
+    // Mapa con markers
+    SpotMap(
+        spots = spots,
+        onSpotClick = { spot -> selectedSpot = spot },
+        onMapClick = { selectedSpot = null }
+    )
+
+    // Card flotante cuando hay un spot seleccionado
+    selectedSpot?.let { spot ->
+        SpotInfoCard(
+            spot = spot,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+private fun SpotInfoCard(spot: SpotEntity) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            SubcomposeAsyncImage(
+                model = spot.imageUri.toUri(),
+                loading = { CircularProgressIndicator() },
+                success = { SubcomposeAsyncImageContent() }
+            )
+            Text(text = spot.title, style = MaterialTheme.typography.titleLarge)
+            Text(text = "📍 ${spot.latitude}, ${spot.longitude}")
         }
     }
 }
 ```
 
-### 3. InfoWindow Personalizado con Coil
-
-Usamos `MarkerInfoWindowContent` para mostrar contenido Compose personalizado al tocar un marcador:
-
-```kotlin
-@Composable
-private fun SpotInfoWindow(spot: SpotEntity) {
-    Column(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .padding(8.dp)
-    ) {
-        AsyncImage(
-            model = spot.imageUri.toUri(),
-            contentDescription = spot.title,
-            modifier = Modifier.size(180.dp, 120.dp).clip(RoundedCornerShape(8.dp))
-        )
-        Text(text = spot.title, style = MaterialTheme.typography.titleMedium)
-        Text(text = "📍 ${spot.latitude}, ${spot.longitude}")
-    }
-}
-```
+**Ventajas de este enfoque:**
+- Control total sobre el contenido y estilo
+- Las imágenes se cargan correctamente con estados de loading
+- No hay problemas de timing con el bitmap rendering
 
 ### 4. Permisos en Runtime con Accompanist
 
@@ -356,7 +386,8 @@ Para probar la funcionalidad completa:
 
 ## Posibles Mejoras
 
-- [x] InfoWindow personalizado con imagen del spot
+- [x] Card flotante personalizado con imagen del spot (reemplaza InfoWindow nativo)
+- [x] Pre-carga de imágenes con Coil para evitar delays
 - [ ] Vista detalle del spot con foto en pantalla completa
 - [ ] Eliminación de spots desde el mapa
 - [ ] Búsqueda de spots por título

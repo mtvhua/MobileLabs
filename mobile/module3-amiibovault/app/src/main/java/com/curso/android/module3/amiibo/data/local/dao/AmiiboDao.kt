@@ -146,6 +146,31 @@ interface AmiiboDao {
     @Query("SELECT COUNT(*) FROM amiibos")
     fun getCount(): Flow<Int>
 
+    /**
+     * =========================================================================
+     * QUERY: Obtener Amiibos paginados
+     * =========================================================================
+     *
+     * Implementa paginación del lado del cliente usando LIMIT y OFFSET.
+     *
+     * @param limit Número máximo de items a retornar
+     * @param offset Número de items a saltar (para paginación)
+     * @return Lista de Amiibos para la página actual
+     *
+     * Ejemplo:
+     * - Página 1 (limit=20, offset=0): Items 1-20
+     * - Página 2 (limit=20, offset=20): Items 21-40
+     * - Página 3 (limit=20, offset=40): Items 41-60
+     */
+    @Query("SELECT * FROM amiibos ORDER BY name ASC LIMIT :limit OFFSET :offset")
+    suspend fun getAmiibosPage(limit: Int, offset: Int): List<AmiiboEntity>
+
+    /**
+     * Obtiene el total de amiibos (para calcular si hay más páginas).
+     */
+    @Query("SELECT COUNT(*) FROM amiibos")
+    suspend fun getTotalCount(): Int
+
     // =========================================================================
     // OPERACIONES PARA DETALLE DE AMIIBO
     // =========================================================================

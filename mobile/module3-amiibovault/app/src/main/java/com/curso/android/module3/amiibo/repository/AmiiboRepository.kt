@@ -109,15 +109,21 @@ class AmiiboRepository(
      * @throws AmiiboError.Database si Room falla al guardar
      * @throws AmiiboError.Unknown para errores no categorizados
      */
+    /**
+     * Refresca todos los amiibos desde la API.
+     *
+     * Descarga TODOS los amiibos y los guarda en Room.
+     * La paginación se hace localmente desde la base de datos.
+     */
     suspend fun refreshAmiibos() {
         try {
-            // 1. Obtener datos de la API
+            // 1. Obtener TODOS los datos de la API
             // Retrofit ejecuta esto en un hilo de background automáticamente
             val response = amiiboApiService.getAllAmiibos()
 
-            // 2. Convertir DTOs a Entities (limitado a 20 resultados)
+            // 2. Convertir DTOs a Entities (todos los resultados)
             // Usamos la función de extensión toEntities() definida en AmiiboDto.kt
-            val entities = response.amiibo.take(MAX_AMIIBOS).toEntities()
+            val entities = response.amiibo.toEntities()
 
             // 3. Guardar en la base de datos (reemplaza todo)
             // replaceAll() es una @Transaction que:
@@ -152,8 +158,44 @@ class AmiiboRepository(
         }
     }
 
+    /**
+     * =========================================================================
+     * PAGINACIÓN - Obtener página de Amiibos
+     * =========================================================================
+     *
+     * Carga una página específica de amiibos desde la base de datos local.
+     *
+     * @param page Número de página (empezando en 0)
+     * @param pageSize Tamaño de página
+     * @return Lista de amiibos para esa página
+     */
+    suspend fun getAmiibosPage(page: Int, pageSize: Int): List<AmiiboEntity> {
+        val offset = page * pageSize
+        return amiiboDao.getAmiibosPage(limit = pageSize, offset = offset)
+    }
+
+    /**
+     * Obtiene el total de amiibos en la base de datos.
+     */
+    suspend fun getTotalCount(): Int {
+        return amiiboDao.getTotalCount()
+    }
+
+    /**
+     * Verifica si hay más páginas disponibles.
+     */
+    suspend fun hasMorePages(currentPage: Int, pageSize: Int): Boolean {
+        val total = getTotalCount()
+        val loaded = (currentPage + 1) * pageSize
+        return loaded < total
+    }
+
     companion object {
-        private const val MAX_AMIIBOS = 20
+        /** Tamaño de página por defecto */
+        const val DEFAULT_PAGE_SIZE = 20
+
+        /** Opciones de tamaño de página disponibles */
+        val PAGE_SIZE_OPTIONS = listOf(20, 50, 100)
     }
 
     /**

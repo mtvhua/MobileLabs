@@ -2,7 +2,7 @@
 # ==========================================
 # VERSIONES DE PLUGINS Y HERRAMIENTAS
 # ==========================================
-agp = "8.13.1"                    # Android Gradle Plugin
+agp = "8.13.2"                    # Android Gradle Plugin
 kotlin = "2.2.0"                 # Kotlin compiler y plugins
 
 # ==========================================

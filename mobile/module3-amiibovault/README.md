@@ -11,6 +11,9 @@ Amiibo Vault es una aplicación diseñada con fines pedagógicos para demostrar 
 - **Retrofit + Kotlinx Serialization**: Consumo de API REST y parsing de JSON
 - **Coil**: Carga asíncrona de imágenes
 - **Koin**: Inyección de dependencias
+- **Paginación Infinita**: Carga progresiva de datos con infinite scroll
+- **Pull-to-Refresh**: Actualización de datos deslizando hacia abajo
+- **Optimizaciones Compose**: Uso de `derivedStateOf` para detección eficiente de scroll
 
 ## Cómo se ve el app
 
@@ -203,7 +206,113 @@ sealed class AmiiboError(
 - Se puede decidir si reintentar (Network sí, Parse no)
 - Mejor experiencia de usuario con mensajes específicos
 
-### 6. Configuración de Timeouts
+### 6. Paginación del Lado del Cliente
+
+La API de Amiibo no soporta paginación del servidor, así que implementamos paginación del lado del cliente:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PAGINACIÓN CLIENT-SIDE                          │
+│                                                                     │
+│    ┌─────────┐         ┌─────────────┐         ┌─────────────┐    │
+│    │   API   │ ──────> │    ROOM     │ ──────> │     UI      │    │
+│    │ (todos) │         │ LIMIT/OFFSET│         │  (páginas)  │    │
+│    └─────────┘         └─────────────┘         └─────────────┘    │
+│                                                                     │
+│    1. API retorna TODOS los amiibos (~900)                         │
+│    2. Se guardan todos en Room                                      │
+│    3. UI carga por páginas usando LIMIT/OFFSET                     │
+│    4. Infinite scroll detecta scroll al final                       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**DAO con LIMIT/OFFSET:**
+```kotlin
+@Query("SELECT * FROM amiibos ORDER BY name ASC LIMIT :limit OFFSET :offset")
+suspend fun getAmiibosPage(limit: Int, offset: Int): List<AmiiboEntity>
+```
+
+**Opciones de tamaño de página:** 20, 50, 100 items (configurable por el usuario)
+
+### 7. Pull-to-Refresh (Material 3)
+
+Patrón de UX que permite actualizar contenido deslizando hacia abajo:
+
+```kotlin
+PullToRefreshBox(
+    isRefreshing = state.isRefreshing,
+    onRefresh = { viewModel.refreshAmiibos() }
+) {
+    // Contenido scrollable
+    AmiiboGrid(...)
+}
+```
+
+**Beneficios sobre un LinearProgressIndicator manual:**
+- Animación nativa del sistema (familiar para usuarios)
+- Gesture handling automático
+- Integración natural con el scroll del contenido
+
+### 8. derivedStateOf - Optimización de Compose
+
+`derivedStateOf` es una optimización clave para valores derivados de otros estados:
+
+```kotlin
+// ❌ ANTES: LaunchedEffect se ejecuta en CADA scroll
+LaunchedEffect(gridState.firstVisibleItemIndex) {
+    val shouldLoad = /* cálculo */
+    if (shouldLoad) onLoadMore()
+}
+
+// ✅ DESPUÉS: Solo notifica cuando el RESULTADO cambia
+val shouldLoadMore by remember {
+    derivedStateOf {
+        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        lastVisible >= totalItems - 6 && hasMorePages && !isLoadingMore
+    }
+}
+
+LaunchedEffect(shouldLoadMore) {
+    if (shouldLoadMore) onLoadMore()
+}
+```
+
+**Cuándo usar cada uno:**
+| Técnica | Uso |
+|---------|-----|
+| `derivedStateOf` | Valores **derivados** de otro estado (ej: "¿debo cargar más?") |
+| `LaunchedEffect` | **Efectos secundarios** (llamadas a APIs, navegación) |
+| `remember` | Valores que **no cambian** entre recomposiciones |
+
+### 9. Manejo de Errores en Paginación
+
+Los errores al cargar más páginas se manejan de forma diferente al error principal:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Error Principal (sin datos)    │  Error de Paginación (con datos)  │
+├────────────────────────────────┼────────────────────────────────────┤
+│                                │                                    │
+│       ┌───────────────┐        │    ┌─────┐ ┌─────┐ ┌─────┐       │
+│       │    ❌ Error   │        │    │ Card│ │ Card│ │ Card│       │
+│       │               │        │    └─────┘ └─────┘ └─────┘       │
+│       │  [Reintentar] │        │    ┌─────┐ ┌─────┐ ┌─────┐       │
+│       └───────────────┘        │    │ Card│ │ Card│ │ Card│       │
+│                                │    └─────┘ └─────┘ └─────┘       │
+│                                │    ┌─────────────────────────┐    │
+│                                │    │ ❌ Error | [Reintentar] │    │
+│                                │    └─────────────────────────┘    │
+│                                │                                    │
+└────────────────────────────────┴────────────────────────────────────┘
+```
+
+**Ventajas:**
+- Los datos existentes permanecen visibles
+- El usuario no pierde su posición de scroll
+- El botón "Reintentar" aparece inline al final de la lista
+
+### 10. Configuración de Timeouts
 
 OkHttp está configurado con timeouts de 15 segundos:
 
@@ -220,7 +329,7 @@ OkHttpClient.Builder()
 - Suficiente para conexiones móviles lentas
 - No demasiado largo que frustre al usuario
 
-### 7. Migraciones de Room (fallbackToDestructiveMigration)
+### 11. Migraciones de Room (fallbackToDestructiveMigration)
 
 En desarrollo usamos `fallbackToDestructiveMigration()` que **BORRA todos los datos** si la versión de la BD cambia:
 
@@ -275,6 +384,9 @@ Ver: [Room Migrations Guide](https://developer.android.com/training/data-storage
 - [Koin Documentation](https://insert-koin.io/docs/quickstart/kotlin/)
 - [Sealed Classes in Kotlin](https://kotlinlang.org/docs/sealed-classes.html)
 - [StateFlow and SharedFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow)
+- [Pull-to-Refresh (Material 3)](https://developer.android.com/reference/kotlin/androidx/compose/material3/pulltorefresh/package-summary)
+- [derivedStateOf en Compose](https://developer.android.com/jetpack/compose/side-effects#derivedstateof)
+- [Infinite Scroll/Pagination](https://developer.android.com/topic/libraries/architecture/paging/v3-overview)
 
 ## Licencia
 

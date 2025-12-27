@@ -9,8 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
+import org.koin.androidx.compose.koinViewModel
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.curso.android.module4.cityspots.ui.components.RequirePermissions
@@ -134,7 +134,7 @@ fun CitySpotsNavigation() {
      * - hiltViewModel(): Con Hilt DI
      * - viewModel(viewModelStoreOwner): ViewModel compartido
      */
-    val sharedViewModel: MapViewModel = viewModel()
+    val sharedViewModel: MapViewModel = koinViewModel()
 
     NavHost(
         navController = navController,

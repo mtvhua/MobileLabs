@@ -6,38 +6,54 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,6 +138,13 @@ fun AmiiboListScreen(
      * - Sin 'by' sería: uiState.value para acceder
      */
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pageSize by viewModel.pageSize.collectAsStateWithLifecycle()
+    val hasMorePages by viewModel.hasMorePages.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val paginationError by viewModel.paginationError.collectAsStateWithLifecycle()
+
+    // Estado para el dropdown del tamaño de página
+    var showPageSizeDropdown by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -130,7 +153,7 @@ fun AmiiboListScreen(
              *
              * Componentes:
              * - title: Título de la app
-             * - actions: Botones de acción (refresh)
+             * - actions: Selector de límite + botón refresh
              * - colors: Esquema de colores personalizado
              */
             TopAppBar(
@@ -141,6 +164,49 @@ fun AmiiboListScreen(
                     )
                 },
                 actions = {
+                    /**
+                     * CONCEPTO: Dropdown para seleccionar tamaño de página
+                     *
+                     * Box envuelve el botón y el menú para posicionar
+                     * correctamente el dropdown debajo del botón.
+                     */
+                    Box {
+                        // Botón que muestra el tamaño de página actual
+                        TextButton(
+                            onClick = { showPageSizeDropdown = true }
+                        ) {
+                            Text(
+                                text = "Página: $pageSize",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
+                        // Menú desplegable con opciones
+                        DropdownMenu(
+                            expanded = showPageSizeDropdown,
+                            onDismissRequest = { showPageSizeDropdown = false }
+                        ) {
+                            viewModel.pageSizeOptions.forEach { size ->
+                                DropdownMenuItem(
+                                    text = { Text("$size por página") },
+                                    onClick = {
+                                        viewModel.setPageSize(size)
+                                        showPageSizeDropdown = false
+                                    },
+                                    leadingIcon = if (size == pageSize) {
+                                        { Text("✓") }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+
                     // Botón de refresh
                     IconButton(onClick = { viewModel.refreshAmiibos() }) {
                         Icon(
@@ -179,18 +245,46 @@ fun AmiiboListScreen(
 
             // Estado de éxito con datos
             is AmiiboUiState.Success -> {
-                Column(modifier = Modifier.padding(paddingValues)) {
-                    // Indicador de refresh en la parte superior
-                    if (state.isRefreshing) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Grid de Amiibos
+                /**
+                 * =====================================================================
+                 * PULL-TO-REFRESH (Material 3)
+                 * =====================================================================
+                 *
+                 * PullToRefreshBox es el componente oficial de Material 3 para
+                 * implementar el patrón "pull-to-refresh" (deslizar hacia abajo
+                 * para actualizar).
+                 *
+                 * CONCEPTO: Pull-to-Refresh
+                 * -------------------------
+                 * Es un patrón de UX muy común en apps móviles que permite al
+                 * usuario actualizar el contenido deslizando hacia abajo desde
+                 * la parte superior de la lista.
+                 *
+                 * Parámetros clave:
+                 * - isRefreshing: Controla si se muestra el indicador de carga
+                 * - onRefresh: Callback que se ejecuta cuando el usuario "suelta"
+                 *
+                 * VENTAJAS sobre LinearProgressIndicator manual:
+                 * 1. Animación nativa del sistema (familiar para el usuario)
+                 * 2. Gesture handling automático
+                 * 3. Integración con el scroll del contenido
+                 *
+                 * NOTA: Requiere @OptIn(ExperimentalMaterial3Api::class)
+                 */
+                PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { viewModel.refreshAmiibos() },
+                    modifier = Modifier.padding(paddingValues)
+                ) {
+                    // Grid de Amiibos con paginación
                     AmiiboGrid(
                         amiibos = state.amiibos,
                         onAmiiboClick = onAmiiboClick,
+                        hasMorePages = hasMorePages,
+                        isLoadingMore = isLoadingMore,
+                        paginationError = paginationError,
+                        onLoadMore = { viewModel.loadNextPage() },
+                        onRetryLoadMore = { viewModel.retryLoadMore() },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -222,6 +316,11 @@ fun AmiiboListScreen(
                         AmiiboGrid(
                             amiibos = state.cachedAmiibos,
                             onAmiiboClick = onAmiiboClick,
+                            hasMorePages = false,
+                            isLoadingMore = false,
+                            paginationError = null,
+                            onLoadMore = {},
+                            onRetryLoadMore = {},
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -408,56 +507,254 @@ private fun ErrorBanner(
 }
 
 /**
- * Grid de Amiibos usando LazyVerticalGrid.
+ * Grid de Amiibos con soporte para paginación infinita.
  *
- * LazyVerticalGrid:
- * - Renderiza solo los items visibles (eficiente)
- * - GridCells.Fixed(2): 2 columnas fijas
- * - items(): Itera sobre la lista de Amiibos
+ * CONCEPTO: Infinite Scroll / Pagination
+ * --------------------------------------
+ * La paginación infinita carga más contenido cuando el usuario
+ * se acerca al final de la lista. Esto mejora el rendimiento
+ * al no cargar todos los datos de una vez.
+ *
+ * Implementación:
+ * 1. Detectamos cuando el usuario está cerca del final (derivedStateOf)
+ * 2. Llamamos a onLoadMore() para cargar la siguiente página
+ * 3. Mostramos un indicador de carga o botón de reintentar al final
  *
  * @param amiibos Lista de Amiibos a mostrar
+ * @param hasMorePages Indica si hay más páginas por cargar
+ * @param isLoadingMore Indica si está cargando la siguiente página
+ * @param paginationError Mensaje de error si falló la carga (null si no hay error)
+ * @param onLoadMore Callback para cargar más items
+ * @param onRetryLoadMore Callback para reintentar carga después de error
  */
 @Composable
 private fun AmiiboGrid(
     amiibos: List<AmiiboEntity>,
     onAmiiboClick: (String) -> Unit,
+    hasMorePages: Boolean,
+    isLoadingMore: Boolean,
+    paginationError: String?,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val gridState = rememberLazyGridState()
+
     /**
-     * LazyVerticalGrid es el equivalente de RecyclerView con GridLayoutManager.
+     * =========================================================================
+     * DERIVEDSTATEOF - Optimización de Compose
+     * =========================================================================
      *
-     * Características:
-     * - Lazy: Solo renderiza items visibles en pantalla
-     * - Recicla celdas al hacer scroll (eficiente en memoria)
-     * - Soporta headers, footers, spans personalizados
+     * CONCEPTO: derivedStateOf vs LaunchedEffect
+     * ------------------------------------------
+     * Antes usábamos LaunchedEffect para detectar el scroll:
+     * ```kotlin
+     * LaunchedEffect(gridState.firstVisibleItemIndex, amiibos.size) {
+     *     // Calcular si debemos cargar más...
+     * }
+     * ```
      *
-     * GridCells.Fixed(2): Exactamente 2 columnas
-     * GridCells.Adaptive(minSize = 150.dp): Tantas columnas como quepan
+     * PROBLEMA con LaunchedEffect:
+     * - Se ejecuta en CADA cambio de firstVisibleItemIndex
+     * - Incluso si el resultado del cálculo no cambia
+     * - Genera recomposiciones innecesarias
+     *
+     * SOLUCIÓN con derivedStateOf:
+     * - Solo notifica cuando el RESULTADO del cálculo cambia
+     * - Más eficiente para valores derivados de otros estados
+     * - Patrón recomendado para cálculos basados en scroll
+     *
+     * CUÁNDO USAR CADA UNO:
+     * - derivedStateOf: Cuando necesitas un valor DERIVADO de otro estado
+     *   y solo te importa cuando el resultado cambia
+     * - LaunchedEffect: Cuando necesitas ejecutar efectos secundarios
+     *   (llamadas a APIs, navegación, etc.)
+     *
+     * En este caso, shouldLoadMore es un Boolean derivado del estado del grid.
+     * Solo nos importa cuando cambia de false a true.
      */
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val layoutInfo = gridState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+
+            // Condición: estamos a 6 items del final Y hay más páginas
+            // Y no estamos cargando Y no hay error pendiente
+            lastVisibleItem >= totalItems - 6 &&
+                    hasMorePages &&
+                    !isLoadingMore &&
+                    paginationError == null &&
+                    totalItems > 0
+        }
+    }
+
+    /**
+     * LaunchedEffect SOLO se ejecuta cuando shouldLoadMore cambia a true.
+     * Esto es mucho más eficiente que observar firstVisibleItemIndex directamente.
+     */
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) {
+            onLoadMore()
+        }
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = modifier,
+        state = gridState,
         contentPadding = PaddingValues(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        /**
-         * items(amiibos, key = { it.id }):
-         * - Itera sobre cada Amiibo
-         * - key: Identificador único para optimizar recomposición
-         *   Cuando la lista cambia, Compose usa el key para:
-         *   - Reusar componentes existentes
-         *   - Animar cambios correctamente
-         *   - Preservar estado interno de cada item
-         */
+        // Items de Amiibos
         items(
             items = amiibos,
-            key = { it.id }  // Importante para optimización
+            key = { it.id }
         ) { amiibo ->
             AmiiboCard(
                 amiibo = amiibo,
                 onClick = { onAmiiboClick(amiibo.name) }
             )
+        }
+
+        // Indicador de carga al final (ocupa 2 columnas)
+        if (isLoadingMore) {
+            item(span = { GridItemSpan(2) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+
+        /**
+         * =====================================================================
+         * ERROR DE PAGINACIÓN CON BOTÓN DE REINTENTAR
+         * =====================================================================
+         *
+         * CONCEPTO: Errores Inline en Infinite Scroll
+         * -------------------------------------------
+         * Cuando falla la carga de más items, NO queremos:
+         * - Mostrar una pantalla de error completa (perdemos los datos)
+         * - Ignorar el error silenciosamente (mala UX)
+         *
+         * En su lugar, mostramos un componente inline al final de la lista
+         * que permite al usuario:
+         * 1. Ver que hubo un error
+         * 2. Reintentar la carga sin perder su posición de scroll
+         *
+         * Este patrón es usado por apps como Twitter, Instagram, Reddit, etc.
+         */
+        if (paginationError != null) {
+            item(span = { GridItemSpan(2) }) {
+                PaginationErrorItem(
+                    errorMessage = paginationError,
+                    onRetry = onRetryLoadMore
+                )
+            }
+        }
+
+        // Mensaje cuando no hay más páginas
+        if (!hasMorePages && amiibos.isNotEmpty() && paginationError == null) {
+            item(span = { GridItemSpan(2) }) {
+                Text(
+                    text = "— Fin de la lista (${amiibos.size} amiibos) —",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * COMPONENTE: Error de Paginación Inline
+ * ============================================================================
+ *
+ * Muestra un mensaje de error y botón de reintentar al final de la lista
+ * cuando falla la carga de más items.
+ *
+ * DISEÑO:
+ * - Card con color de error suave
+ * - Icono + mensaje + botón en layout horizontal compacto
+ * - Botón outlined para diferenciarlo del botón principal
+ *
+ * @param errorMessage Mensaje de error a mostrar
+ * @param onRetry Callback cuando el usuario presiona "Reintentar"
+ */
+@Composable
+private fun PaginationErrorItem(
+    errorMessage: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icono y mensaje
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Botón de reintentar
+            OutlinedButton(
+                onClick = onRetry,
+                modifier = Modifier.height(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Replay,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Reintentar",
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
         }
     }
 }

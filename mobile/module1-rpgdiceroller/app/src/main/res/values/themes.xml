@@ -23,12 +23,23 @@ Sin embargo, la mayor parte del theming se hace en Compose con MaterialTheme.
     <!--
     Theme.RPGDiceRollerApp: Nuestro tema personalizado.
 
-    Hereda de Theme.Material3.DayNight.NoActionBar porque:
-      - Material3: Usa Material Design 3 (Material You)
-      - DayNight: Soporta modo oscuro automáticamente
-      - NoActionBar: No queremos la ActionBar tradicional (usamos TopAppBar de Compose)
+    IMPORTANTE PARA APPS DE COMPOSE:
+    ================================
+    En apps que usan Jetpack Compose, el theming principal se hace en código
+    Kotlin con MaterialTheme. El tema XML es solo un "contenedor" mínimo que:
+      - Configura edge-to-edge (barras de sistema transparentes)
+      - Proporciona un tema base para el splash screen
+
+    Usamos Theme.Material.Light.NoActionBar porque:
+      - Es un tema base incluido en Android (no requiere dependencias extra)
+      - NoActionBar: No queremos ActionBar (usamos TopAppBar de Compose)
+      - Light: Fondo claro por defecto (Compose maneja el tema dinámico)
+
+    NOTA: Los temas "Theme.Material3.xxx" de XML vienen de la librería MDC
+    (com.google.android.material:material), que NO es necesaria en apps
+    Compose-only que usan androidx.compose.material3.
     -->
-    <style name="Theme.RPGDiceRollerApp" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.RPGDiceRollerApp" parent="android:Theme.Material.Light.NoActionBar">
         <!--
         Configuración para Edge-to-Edge UI.
         Estos atributos permiten que nuestra app dibuje detrás de las

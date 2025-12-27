@@ -40,12 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.curso.android.module4.cityspots.ui.viewmodel.MapViewModel
+import org.koin.androidx.compose.koinViewModel
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -83,7 +83,7 @@ import kotlin.coroutines.suspendCoroutine
 @Composable
 fun CameraScreen(
     onNavigateBack: () -> Unit,
-    viewModel: MapViewModel = viewModel()
+    viewModel: MapViewModel = koinViewModel()
 ) {
     // =========================================================================
     // CONTEXTO Y LIFECYCLE

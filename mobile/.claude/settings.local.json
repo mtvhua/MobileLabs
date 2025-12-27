@@ -14,7 +14,10 @@
       "Bash(fi)",
       "Bash(done)",
       "Bash(__NEW_LINE__ echo \"\")",
-      "Bash(for f in /Users/ykro/code/awa/mobile/module*/slides/slides.md)"
+      "Bash(for f in /Users/ykro/code/awa/mobile/module*/slides/slides.md)",
+      "Bash(adb logcat:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -d -s AndroidRuntime:E)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -d)"
     ],
     "deny": [],
     "ask": []

@@ -167,6 +167,57 @@ class AmiiboViewModel(
     val uiState: StateFlow<AmiiboUiState> = _uiState.asStateFlow()
 
     /**
+     * =========================================================================
+     * PAGINACIÓN
+     * =========================================================================
+     *
+     * Implementamos paginación del lado del cliente:
+     * 1. Todos los datos se descargan de la API y se guardan en Room
+     * 2. La UI carga páginas desde Room usando LIMIT/OFFSET
+     * 3. El usuario puede configurar el tamaño de página (20, 50, 100)
+     */
+
+    /** Tamaño de página actual */
+    private val _pageSize = MutableStateFlow(AmiiboRepository.DEFAULT_PAGE_SIZE)
+    val pageSize: StateFlow<Int> = _pageSize.asStateFlow()
+
+    /** Página actual (empezando en 0) */
+    private val _currentPage = MutableStateFlow(0)
+
+    /** Lista acumulada de amiibos cargados */
+    private val _loadedAmiibos = MutableStateFlow<List<AmiiboEntity>>(emptyList())
+
+    /** Indica si hay más páginas por cargar */
+    private val _hasMorePages = MutableStateFlow(true)
+    val hasMorePages: StateFlow<Boolean> = _hasMorePages.asStateFlow()
+
+    /** Indica si está cargando la siguiente página */
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    /**
+     * =========================================================================
+     * ERROR DE PAGINACIÓN
+     * =========================================================================
+     *
+     * CONCEPTO: Errores Granulares en Paginación
+     * ------------------------------------------
+     * A diferencia del error principal (que afecta toda la pantalla), el error
+     * de paginación solo afecta la carga de más items. Esto permite:
+     *
+     * 1. Mantener los datos ya cargados visibles
+     * 2. Mostrar un botón de "Reintentar" inline al final de la lista
+     * 3. No interrumpir la experiencia del usuario
+     *
+     * Es un patrón común en apps con infinite scroll como Twitter, Instagram, etc.
+     */
+    private val _paginationError = MutableStateFlow<String?>(null)
+    val paginationError: StateFlow<String?> = _paginationError.asStateFlow()
+
+    /** Opciones de tamaño de página disponibles */
+    val pageSizeOptions: List<Int> = AmiiboRepository.PAGE_SIZE_OPTIONS
+
+    /**
      * Flow de amiibos desde la base de datos.
      *
      * stateIn(): Convierte Flow a StateFlow
@@ -237,10 +288,123 @@ class AmiiboViewModel(
      * 3. En éxito → Success (automático por el Flow de Room)
      * 4. En error → Error con datos en cache si existen
      */
+    /**
+     * =========================================================================
+     * CAMBIAR TAMAÑO DE PÁGINA
+     * =========================================================================
+     *
+     * Actualiza el tamaño de página y reinicia la paginación.
+     *
+     * @param newSize Nuevo tamaño de página
+     */
+    fun setPageSize(newSize: Int) {
+        if (newSize != _pageSize.value && newSize in pageSizeOptions) {
+            _pageSize.value = newSize
+            resetPagination()
+            loadFirstPage()
+        }
+    }
+
+    /**
+     * Reinicia el estado de paginación.
+     * Limpia también cualquier error de paginación pendiente.
+     */
+    private fun resetPagination() {
+        _currentPage.value = 0
+        _loadedAmiibos.value = emptyList()
+        _hasMorePages.value = true
+        _paginationError.value = null  // Limpiar error al reiniciar
+    }
+
+    /**
+     * =========================================================================
+     * CARGAR SIGUIENTE PÁGINA (Infinite Scroll)
+     * =========================================================================
+     *
+     * Llamado cuando el usuario hace scroll hasta el final de la lista.
+     *
+     * MANEJO DE ERRORES EN PAGINACIÓN:
+     * --------------------------------
+     * Si falla la carga de más items:
+     * 1. NO cambiamos el estado principal (los datos existentes siguen visibles)
+     * 2. Guardamos el error en _paginationError
+     * 3. La UI muestra un botón "Reintentar" al final de la lista
+     * 4. El usuario puede reintentar sin perder su posición de scroll
+     */
+    fun loadNextPage() {
+        // Evitar cargas duplicadas o si hay error pendiente
+        if (_isLoadingMore.value || !_hasMorePages.value || _paginationError.value != null) return
+
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            _paginationError.value = null  // Limpiar error previo
+
+            try {
+                val nextPage = _currentPage.value + 1
+                val newItems = repository.getAmiibosPage(nextPage, _pageSize.value)
+
+                if (newItems.isNotEmpty()) {
+                    _currentPage.value = nextPage
+                    _loadedAmiibos.value = _loadedAmiibos.value + newItems
+                    _hasMorePages.value = repository.hasMorePages(nextPage, _pageSize.value)
+
+                    _uiState.value = AmiiboUiState.Success(
+                        amiibos = _loadedAmiibos.value,
+                        isRefreshing = false
+                    )
+                } else {
+                    _hasMorePages.value = false
+                }
+            } catch (e: Exception) {
+                // Guardar error para mostrar botón de reintentar
+                _paginationError.value = e.message ?: "Error al cargar más items"
+            } finally {
+                _isLoadingMore.value = false
+            }
+        }
+    }
+
+    /**
+     * =========================================================================
+     * REINTENTAR CARGA DE PÁGINA
+     * =========================================================================
+     *
+     * Llamado cuando el usuario presiona "Reintentar" después de un error
+     * de paginación. Limpia el error y vuelve a intentar cargar.
+     */
+    fun retryLoadMore() {
+        _paginationError.value = null
+        loadNextPage()
+    }
+
+    /**
+     * Carga la primera página de datos.
+     */
+    private fun loadFirstPage() {
+        viewModelScope.launch {
+            try {
+                val firstPageItems = repository.getAmiibosPage(0, _pageSize.value)
+                _currentPage.value = 0
+                _loadedAmiibos.value = firstPageItems
+                _hasMorePages.value = repository.hasMorePages(0, _pageSize.value)
+
+                _uiState.value = AmiiboUiState.Success(
+                    amiibos = firstPageItems,
+                    isRefreshing = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = AmiiboUiState.Error(
+                    message = "Error al cargar datos",
+                    isRetryable = true
+                )
+            }
+        }
+    }
+
     fun refreshAmiibos() {
         viewModelScope.launch {
             // Determinar estado durante la carga
-            val currentAmiibos = amiibosFromDb.value
+            val currentAmiibos = _loadedAmiibos.value
             if (currentAmiibos.isEmpty()) {
                 // No hay cache, mostrar loading
                 _uiState.value = AmiiboUiState.Loading
@@ -253,15 +417,17 @@ class AmiiboViewModel(
             }
 
             try {
-                // Llamar al repositorio para refrescar datos
-                // Esto actualiza Room, que dispara el Flow observado arriba
+                // Llamar al repositorio para refrescar TODOS los datos desde la API
                 repository.refreshAmiibos()
 
-                // El estado Success se actualiza automáticamente por observeDatabaseChanges()
-                // Solo necesitamos quitar el indicador de refreshing
-                val updatedAmiibos = amiibosFromDb.value
+                // Reiniciar paginación y cargar primera página
+                resetPagination()
+                val firstPageItems = repository.getAmiibosPage(0, _pageSize.value)
+                _loadedAmiibos.value = firstPageItems
+                _hasMorePages.value = repository.hasMorePages(0, _pageSize.value)
+
                 _uiState.value = AmiiboUiState.Success(
-                    amiibos = updatedAmiibos,
+                    amiibos = firstPageItems,
                     isRefreshing = false
                 )
 
@@ -279,7 +445,7 @@ class AmiiboViewModel(
                  * - Si es del servidor (Parse) → esperar y reintentar después
                  * - Si es local (Database) → reiniciar app o liberar espacio
                  */
-                val cachedAmiibos = amiibosFromDb.value
+                val cachedAmiibos = _loadedAmiibos.value
                 val errorType = ErrorType.from(e)
 
                 // Determinar si el error es recuperable con un reintento
@@ -298,7 +464,7 @@ class AmiiboViewModel(
                 )
             } catch (e: Exception) {
                 // Catch-all para errores no tipados (no debería llegar aquí)
-                val cachedAmiibos = amiibosFromDb.value
+                val cachedAmiibos = _loadedAmiibos.value
                 _uiState.value = AmiiboUiState.Error(
                     message = e.message ?: "Error desconocido al cargar datos",
                     errorType = ErrorType.UNKNOWN,
