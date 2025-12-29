@@ -14,6 +14,24 @@
 // =============================================================================
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { uploadPosterToStorage, getPosterFromStorage } from './firebase/storage';
+
+// =============================================================================
+// CONFIGURACIÓN DE MODELOS
+// =============================================================================
+
+/**
+ * Modelos de Gemini disponibles.
+ *
+ * ## Modelos de texto
+ * - gemini-1.5-flash: Rápido y económico para texto
+ * - gemini-1.5-pro: Más capaz pero más lento
+ *
+ * ## Modelos de imagen
+ * - gemini-2.0-flash-preview-image-generation: Genera imágenes (experimental)
+ */
+const TEXT_MODEL = 'gemini-1.5-flash';
+const IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation';
 
 /**
  * Inicializa el cliente de Gemini.
@@ -153,7 +171,7 @@ export async function generateEventDescription(
   }
 
   const safeInput = validation.sanitized;
-  const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = client.getGenerativeModel({ model: TEXT_MODEL });
 
   const prompt = `Genera una descripción atractiva y profesional para un evento con las siguientes características:
 
@@ -206,7 +224,7 @@ export async function generateEventTags(
   const safeTitle = sanitizeInput(title);
   const safeDescription = sanitizeInput(description);
 
-  const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = client.getGenerativeModel({ model: TEXT_MODEL });
 
   const prompt = `Analiza el siguiente evento y sugiere 5 etiquetas relevantes:
 
@@ -257,7 +275,7 @@ export async function improveDescription(description: string): Promise<string | 
   // Sanitizar input para prevenir prompt injection
   const safeDescription = sanitizeInput(description);
 
-  const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = client.getGenerativeModel({ model: TEXT_MODEL });
 
   const prompt = `Mejora la siguiente descripción de evento haciéndola más atractiva y profesional:
 
@@ -278,6 +296,112 @@ Requisitos:
     return response.text().trim();
   } catch (error) {
     console.error('Error mejorando descripción con Gemini:', error);
+    return null;
+  }
+}
+
+// =============================================================================
+// GENERACIÓN DE IMÁGENES (POSTERS)
+// =============================================================================
+
+/**
+ * Input para generar poster de evento.
+ */
+interface GeneratePosterInput {
+  eventId: string;
+  title: string;
+  category: string;
+  date: string;
+  location: string;
+}
+
+/**
+ * Genera un poster/imagen promocional para un evento usando Gemini.
+ *
+ * ## Modelo de Imagen
+ * Usamos gemini-2.0-flash-preview-image-generation que puede generar imágenes.
+ *
+ * ## Caching con Firebase Storage
+ * Las imágenes generadas se guardan en Firebase Storage para:
+ * 1. Evitar regenerar la misma imagen (ahorro de quota/costos)
+ * 2. Servir la imagen más rápido en requests posteriores
+ * 3. Mantener consistencia (mismo poster siempre)
+ *
+ * @param input - Datos del evento para generar el poster
+ * @returns URL de la imagen generada o null si hay error
+ */
+export async function generateEventPoster(
+  input: GeneratePosterInput
+): Promise<string | null> {
+  // 1. Verificar si ya existe en cache (Firebase Storage)
+  const cachedUrl = await getPosterFromStorage(input.eventId);
+  if (cachedUrl) {
+    console.log(`📦 Poster encontrado en cache: ${input.eventId}`);
+    return cachedUrl;
+  }
+
+  // 2. Generar nueva imagen con Gemini
+  const client = getGeminiClient();
+  if (!client) {
+    return null;
+  }
+
+  // Sanitizar inputs
+  const safeTitle = sanitizeInput(input.title);
+  const safeCategory = sanitizeInput(input.category);
+  const safeLocation = sanitizeInput(input.location);
+
+  const model = client.getGenerativeModel({
+    model: IMAGE_MODEL,
+    generationConfig: {
+      responseModalities: ['Text', 'Image'],
+    },
+  });
+
+  const prompt = `Create a professional and visually striking event poster with these details:
+
+Event: ${safeTitle}
+Category: ${safeCategory}
+Location: ${safeLocation}
+Date: ${input.date}
+
+Requirements:
+- Modern, clean design suitable for social media
+- Vibrant colors that match the event category
+- Include visual elements related to the event theme
+- Professional typography style (don't include actual text, just the design)
+- Aspect ratio suitable for a vertical poster (3:4)
+- High quality, eye-catching composition`;
+
+  try {
+    console.log(`🎨 Generando poster para evento: ${input.eventId}`);
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+
+    // Buscar la imagen en la respuesta
+    const imagePart = response.candidates?.[0]?.content?.parts?.find(
+      (part: { inlineData?: { mimeType: string; data: string } }) => part.inlineData?.mimeType?.startsWith('image/')
+    );
+
+    if (!imagePart?.inlineData) {
+      console.error('No se encontró imagen en la respuesta de Gemini');
+      return null;
+    }
+
+    // 3. Subir a Firebase Storage para cache
+    const imageBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
+    const mimeType = imagePart.inlineData.mimeType;
+
+    const publicUrl = await uploadPosterToStorage(
+      input.eventId,
+      imageBuffer,
+      mimeType
+    );
+
+    console.log(`✅ Poster generado y cacheado: ${publicUrl}`);
+    return publicUrl;
+  } catch (error) {
+    console.error('Error generando poster con Gemini:', error);
     return null;
   }
 }
