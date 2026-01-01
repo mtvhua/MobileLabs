@@ -1,3 +1,14 @@
+// =============================================================================
+// FIREBASE CLIENT CONFIG - Module 5
+// =============================================================================
+// Inicialización segura de Firebase para el cliente (Browser).
+//
+// ## Singleton Pattern
+// `getApps().length` verifica si Firebase ya fue inicializado para evitar
+// errores de "Firebase App named '[DEFAULT]' already exists" durante
+// el Hot Module Replacement (HMR) de Next.js.
+// =============================================================================
+
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -12,7 +23,7 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
 };
 
-// Initialize Firebase
+// Initialize Firebase (Singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);

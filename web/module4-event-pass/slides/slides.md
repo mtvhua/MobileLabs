@@ -514,12 +514,14 @@ export async function createEvent(prevState: any, formData: FormData) {
     });
 
     if (!result.success) {
-        return { error: result.error.issues[0].message };
+        return { success: false, message: result.error.issues[0].message };
     }
 
     await db.event.create({ data: result.data });
     revalidatePath('/events');
-    redirect('/events');
+    
+    // Return success state instead of redirecting
+    return { success: true, message: 'Event created!' };
 }
 ```
 

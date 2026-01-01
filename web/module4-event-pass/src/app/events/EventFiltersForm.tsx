@@ -1,31 +1,28 @@
 // =============================================================================
 // COMPONENTE EVENT FILTERS FORM - Module 4: Event Pass
 // =============================================================================
-// Formulario de filtros usando form nativo con method="GET".
+// Formulario de filtros mejorado con interactividad.
 //
-// ## Server Component
-// Este componente es un Server Component (sin 'use client') porque:
-// 1. Usa <form method="GET"> nativo de HTML
-// 2. No requiere JavaScript para funcionar
-// 3. Los filtros se envían como query params automáticamente
+// ## Client Component
+// Lo hemos convertido a 'use client' para permitir:
+// 1. Auto-submit al cambiar selectores (UX más fluida)
+// 2. Mantener la URL sincronizada sin recargas completas
+// 3. Búsqueda con debounce para escribir y filtrar automáticamente
 //
 // ## Progressive Enhancement
-// El form funciona incluso sin JavaScript habilitado.
-// Los usuarios con JS obtienen navegación sin recarga completa.
-//
-// ## URL como estado
-// Los filtros se guardan en la URL automáticamente:
-// - Shareable (el link incluye los filtros)
-// - Bookmarkable
-// - Funciona con botón atrás del navegador
-// - Server-side filtering (mejor performance)
+// Aunque usamos JS para mejorar la UX, el formulario sigue usando 
+// method="GET" y action="/events", por lo que es robusto y estándar.
 // =============================================================================
+
+'use client';
 
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { EVENT_CATEGORIES, CATEGORY_LABELS, type EventCategory } from '@/types/event';
+import { EVENT_CATEGORIES, CATEGORY_LABELS, EVENT_STATUSES, STATUS_LABELS, type EventCategory } from '@/types/event';
+import { useRef, useState, useEffect } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
 
 interface EventFiltersFormProps {
   currentFilters: {
@@ -37,21 +34,49 @@ interface EventFiltersFormProps {
 }
 
 /**
- * Formulario de filtros de eventos (Server Component).
- *
- * ## form method="GET"
- * El formulario usa method="GET" para enviar los filtros como query params.
- * Next.js intercepta la navegación para hacerla más fluida,
- * pero funciona perfectamente sin JavaScript.
+ * Formulario de filtros de eventos (Client Component).
  */
 export function EventFiltersForm({ currentFilters }: EventFiltersFormProps): React.ReactElement {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Estado local para el input de búsqueda
+  const [searchTerm, setSearchTerm] = useState(currentFilters.search ?? '');
+
+  // Valor debounced (retrasado 500ms)
+  const debouncedSearch = useDebounce(searchTerm, 500);
+
+  // Ref para evitar bucle infinito en primer render
+  const isFirstRender = useRef(true);
+
   const hasFilters =
-    currentFilters.search || currentFilters.category || currentFilters.priceMax;
+    currentFilters.search || currentFilters.category || currentFilters.priceMax || currentFilters.status;
+
+  // Efecto para auto-submit cuando cambia el texto debounced
+  useEffect(() => {
+    // Saltamos el primer render para evitar submit al cargar la página
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Enviamos el formulario programáticamente
+    formRef.current?.requestSubmit();
+  }, [debouncedSearch]);
+
+  // Handler para auto-submit de selects
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.currentTarget.form?.requestSubmit(); // Usamos evento directo para select
+  };
+
+  // Handler para input de búsqueda (actualiza estado local)
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   return (
     <div className="space-y-4 rounded-lg border bg-card p-4">
-      {/* Formulario con method GET - no requiere JavaScript */}
-      <form method="GET" action="/events" className="space-y-4">
+      {/* Formulario con method GET */}
+      <form ref={formRef} method="GET" action="/events" className="space-y-4">
         {/* Búsqueda */}
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -59,19 +84,22 @@ export function EventFiltersForm({ currentFilters }: EventFiltersFormProps): Rea
             <Input
               name="search"
               placeholder="Buscar eventos..."
-              defaultValue={currentFilters.search}
+              value={searchTerm}
+              onChange={handleSearchChange}
               className="pl-9"
             />
           </div>
+          {/* Botón de búsqueda (opcional pero bueno para accesibilidad) */}
           <Button type="submit">Buscar</Button>
         </div>
 
         {/* Filtros adicionales */}
         <div className="flex flex-wrap gap-4">
-          {/* Categoría - usando select nativo estilizado */}
+          {/* Categoría */}
           <select
             name="category"
             defaultValue={currentFilters.category ?? ''}
+            onChange={handleFilterChange}
             className="h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Todas las categorías</option>
@@ -82,10 +110,26 @@ export function EventFiltersForm({ currentFilters }: EventFiltersFormProps): Rea
             ))}
           </select>
 
-          {/* Precio maximo - usando select nativo estilizado */}
+          {/* Status */}
+          <select
+            name="status"
+            defaultValue={currentFilters.status ?? ''}
+            onChange={handleFilterChange}
+            className="h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="">Todos los estados</option>
+            {EVENT_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+
+          {/* Precio maximo */}
           <select
             name="priceMax"
             defaultValue={currentFilters.priceMax?.toString() ?? ''}
+            onChange={handleFilterChange}
             className="h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Cualquier precio</option>
@@ -96,12 +140,7 @@ export function EventFiltersForm({ currentFilters }: EventFiltersFormProps): Rea
             <option value="200">Hasta $200</option>
           </select>
 
-          {/* Botón aplicar filtros (opcional, ya que submit también los aplica) */}
-          <Button type="submit" variant="secondary">
-            Aplicar filtros
-          </Button>
-
-          {/* Botón limpiar - usando Link para navegar sin filtros */}
+          {/* Botón limpiar */}
           {hasFilters && (
             <Link href="/events">
               <Button type="button" variant="ghost" className="gap-2">

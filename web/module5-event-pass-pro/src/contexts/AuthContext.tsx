@@ -1,3 +1,15 @@
+// =============================================================================
+// AUTH CONTEXT - Module 5: Event Pass Pro
+// =============================================================================
+// Contexto global de autenticación que gestiona el estado del usuario.
+//
+// ## Conceptos Clave
+// 1. **Context API**: Permite compartir estado (user) en toda la app sin "prop drilling".
+// 2. **onAuthStateChanged**: Listener de tiempo real de Firebase que detecta login/logout.
+// 3. **Sync de Cookies**: Sincronizamos el token de Firebase con cookies para futuras
+//    integraciones con Middleware de Next.js.
+// =============================================================================
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -31,8 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Suscripción al estado de autenticación de Firebase
+    // Se ejecuta automáticamente cuando el usuario inicia o cierra sesión
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+
+      // Educational Note: Cookie Sync
+      // Guardamos el token en una cookie para que el servidor (Next.js Middleware)
+      // pueda verificar la sesión si fuera necesario en el futuro.
       if (user) {
         const token = await user.getIdToken();
         document.cookie = `firebase-auth-token=${token}; path=/; max-age=3600; SameSite=Strict`;
@@ -42,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    // Cleanup function: Desuscribirse al desmontar
     return () => unsubscribe();
   }, []);
 

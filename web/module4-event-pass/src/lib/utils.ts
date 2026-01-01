@@ -99,3 +99,42 @@ export function getAvailableSpots(capacity: number, registered: number): number 
 export function hasAvailableSpots(capacity: number, registered: number): boolean {
   return getAvailableSpots(capacity, registered) > 0;
 }
+
+/**
+ * Formatea fecha para input datetime-local (YYYY-MM-DDTHH:MM)
+ */
+export function formatDateForInput(dateString: string): string {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Formatea una fecha de forma relativa (ej: "En 3 días", "Mañana", "Hace 2 horas").
+ */
+export function formatRelativeDate(date: string | Date): string {
+  const now = new Date();
+  const target = new Date(date);
+  const diffInMs = target.getTime() - now.getTime();
+  const diffInDays = Math.round(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInDays === 0) return 'Hoy';
+  if (diffInDays === 1) return 'Mañana';
+  if (diffInDays === -1) return 'Ayer';
+
+  if (diffInDays > 0) {
+    if (diffInDays < 7) return `En ${diffInDays} días`;
+    if (diffInDays < 30) return `En ${Math.floor(diffInDays / 7)} sem`;
+    return `En ${Math.floor(diffInDays / 30)} meses`;
+  } else {
+    const absDays = Math.abs(diffInDays);
+    if (absDays < 7) return `Hace ${absDays} días`;
+    if (absDays < 30) return `Hace ${Math.floor(absDays / 7)} sem`;
+    return `Hace ${Math.floor(absDays / 30)} meses`;
+  }
+}

@@ -6,16 +6,24 @@
 
 ---
 
-## Stack Tecnologico
+### 6. UI/UX Improvements (Latest)
 
-| Dependencia | Version |
-|-------------|---------|
-| Next.js | 16.1.1 |
-| React | 19.2.1 |
-| TypeScript | 5.9.3 |
-| Tailwind CSS | 4.1.8 |
-| Zod | 4.1.9 |
-| Lucide React | 0.469.0 |
+- **Toast Notifications**: Integrated `shadcn/ui` Toast for success/error feedback on Create, Edit, and Delete actions.
+- **Debounced Search**: Filter events by title with a 500ms debounce to prevent excessive re-renders.
+- **Loading States**: Added `loading.tsx` with skeletons for a smoother data fetching experience.
+- **Relative Dates**: Events display relative dates (e.g., "In 3 days") for better context.
+- **Client-Side Redirection**: Optimized navigation flow after form submission to ensure toast visibility using `router.push` with a micro-delay.
+
+### 7. Tech Stack
+
+| Technology | Version | Usage |
+|------------|---------|-------|
+| Next.js | 16.1.1 | App Router, Server Actions |
+| React | 19.2.1 | `useActionState`, `useTransition`, `useOptimistic` |
+| Tailwind CSS | 4.1.8 | Styling (Utility-first) |
+| Lucide React | Latest | Icons |
+| Radix UI | Latest | Accessible UI Primitives (via Shadcn) |
+| Zod | Latest | Schema Validation |
 
 > Ver [TECH_STACK.md](./TECH_STACK.md) para detalles completos.
 

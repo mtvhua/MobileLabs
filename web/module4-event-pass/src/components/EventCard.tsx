@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Event } from '@/types/event';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/types/event';
-import { formatShortDate, formatPrice, getAvailableSpots } from '@/lib/utils';
+import { formatShortDate, formatPrice, getAvailableSpots, formatRelativeDate } from '@/lib/utils';
 
 interface EventCardProps {
   event: Event;
@@ -56,7 +56,7 @@ export function EventCard({ event }: EventCardProps): React.ReactElement {
 
         {/* Overlay con fecha */}
         <div className="absolute left-3 top-3 rounded-lg bg-background/90 px-3 py-1.5 backdrop-blur-sm">
-          <p className="text-sm font-semibold">{formatShortDate(event.date)}</p>
+          <p className="text-sm font-bold text-primary">{formatRelativeDate(event.date)}</p>
         </div>
 
         {/* Badge de estado si no está publicado */}

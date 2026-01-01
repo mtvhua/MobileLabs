@@ -1,7 +1,15 @@
 // =============================================================================
 // COMPONENTE GENERATE DESCRIPTION BUTTON - Module 5: EventPass Pro
 // =============================================================================
-// Botón que genera descripciones usando Gemini AI.
+// Botón que conecta la UI del cliente con la generación de IA en el servidor.
+//
+// ## Arquitectura: Client sends to API Route
+// 1. Este es un 'use client' component porque necesita interactividad (onClick).
+// 2. Llama a nuestra API Route (/api/generate-description).
+// 3. La API Route usa el SDK de Gemini (con la API key secreta).
+// 4. Retorna el texto generado al cliente.
+//
+// esto evita exponer la API key de Google/Gemini en el navegador.
 // =============================================================================
 
 'use client';
@@ -21,10 +29,6 @@ interface GenerateDescriptionButtonProps {
 
 /**
  * Botón para generar descripción con IA.
- *
- * ## Server Action
- * La generación real ocurre en el servidor via Server Action.
- * Esto protege la API key de Gemini.
  */
 export function GenerateDescriptionButton({
   title,

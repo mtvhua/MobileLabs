@@ -19,7 +19,7 @@
 
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,9 +33,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { createEventAction } from '@/actions/eventActions';
+import { createEventAction, updateEventAction } from '@/actions/eventActions';
 import { EVENT_CATEGORIES, EVENT_STATUSES, CATEGORY_LABELS, STATUS_LABELS } from '@/types/event';
-import type { FormState } from '@/types/event';
+import type { FormState, Event } from '@/types/event';
+import { formatDateForInput } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation';
 
 /**
  * Estado inicial del formulario.
@@ -45,19 +48,26 @@ const initialState: FormState = {
   message: '',
 };
 
+interface EventFormProps {
+  eventId?: string;
+  initialData?: Event;
+}
+
 /**
  * Botón de submit con estado de carga.
- *
- * ## useFormStatus
- * Hook de React DOM que proporciona el estado del formulario padre.
- * Debe usarse dentro de un <form> que use una Server Action.
  */
-function SubmitButton(): React.ReactElement {
+function SubmitButton({ isEditing }: { isEditing: boolean }): React.ReactElement {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" disabled={pending} className="w-full">
-      {pending ? 'Creando evento...' : 'Crear Evento'}
+      {pending
+        ? isEditing
+          ? 'Guardando cambios...'
+          : 'Creando evento...'
+        : isEditing
+          ? 'Guardar Cambios'
+          : 'Crear Evento'}
     </Button>
   );
 }
@@ -78,31 +88,83 @@ function FieldError({ errors }: { errors?: string[] }): React.ReactElement | nul
 }
 
 /**
- * Formulario para crear eventos.
- *
- * ## Arquitectura
- * 1. El formulario usa la action directamente (no onSubmit)
- * 2. useActionState maneja el estado entre submits
- * 3. Los errores se muestran por campo
- * 4. El botón muestra estado de carga automáticamente
+ * Formulario para crear/editar eventos.
  */
-export function EventForm(): React.ReactElement {
-  /**
-   * useActionState conecta una Server Action con estado local.
-   *
-   * @param action - La Server Action a ejecutar
-   * @param initialState - Estado inicial
-   * @returns [state, formAction] - Estado actual y action modificada
-   */
-  const [state, formAction] = useActionState(createEventAction, initialState);
+export function EventForm({ eventId, initialData }: EventFormProps): React.ReactElement {
+  const isEditing = !!eventId && !!initialData;
+
+  // Seleccionamos la acción correcta
+  const action = isEditing
+    ? updateEventAction.bind(null, eventId)
+    : createEventAction;
+
+  const [state, formAction] = useActionState(action, initialState);
+
+  // Helper para valores por defecto (prioridad: state > initialData)
+  const getValue = (field: keyof Event) => {
+    if (state.values?.[field as keyof typeof state.values]) {
+      return state.values[field as keyof typeof state.values];
+    }
+    if (initialData?.[field]) {
+      // Formatear fechas para input datetime-local
+      if ((field === 'date' || field === 'endDate') && typeof initialData[field] === 'string') {
+        return formatDateForInput(initialData[field]);
+      }
+      return initialData[field];
+    }
+    return undefined;
+  };
+
+  const { toast } = useToast();
+  const router = useRouter();
+
+  // ===========================================================================
+  // EDUCATIONAL NOTE: Client-Side Redirection vs Server-Side Redirect
+  // ===========================================================================
+  // We use client-side redirection (router.push) here instead of server-side
+  // redirect() for better UX. Server-side redirect() immediately interrupts
+  // the response, often preventing the toast from appearing or being seen.
+  // By returning a success state and redirecting on the client, we can:
+  // 1. Show the success toast
+  // 2. Wait a brief moment (500ms) for the user to see it
+  // 3. Navigate smoothly to the new page
+  // ===========================================================================
+
+  useEffect(() => {
+    if (state.message) {
+      if (state.success) {
+        toast({
+          title: '¡Éxito!',
+          description: state.message,
+          variant: 'default',
+        });
+
+        // Redirigir al detalle del evento creado/editado con un pequeño delay
+        // para asegurar que el toast se pueda ver
+        if (state.data && 'id' in state.data) {
+          const eventId = state.data.id;
+          setTimeout(() => {
+            router.push(`/events/${eventId}`);
+          }, 500);
+        }
+      } else {
+        toast({
+          title: 'Error',
+          description: state.message,
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [state, toast, router]);
 
   return (
     <Card className="mx-auto max-w-2xl">
       <CardHeader>
-        <CardTitle>Crear Nuevo Evento</CardTitle>
+        <CardTitle>{isEditing ? 'Editar Evento' : 'Crear Nuevo Evento'}</CardTitle>
         <CardDescription>
-          Completa el formulario para publicar tu evento. Los campos marcados con * son
-          obligatorios.
+          {isEditing
+            ? 'Modifica los detalles del evento.'
+            : 'Completa el formulario para publicar tu evento.'}
         </CardDescription>
       </CardHeader>
 
@@ -125,8 +187,8 @@ export function EventForm(): React.ReactElement {
               <Input
                 id="title"
                 name="title"
-                placeholder="Ej: Conferencia de Desarrollo Web 2025"
-                defaultValue={state.values?.title}
+                placeholder="Ej: Conferencia de Desarrollo Web 2026"
+                defaultValue={getValue('title') as string}
                 required
               />
               <FieldError errors={state.errors?.title} />
@@ -139,7 +201,7 @@ export function EventForm(): React.ReactElement {
                 id="description"
                 name="description"
                 placeholder="Describe tu evento en detalle (minimo 20 caracteres)"
-                defaultValue={state.values?.description}
+                defaultValue={getValue('description') as string}
                 rows={4}
                 required
               />
@@ -150,7 +212,7 @@ export function EventForm(): React.ReactElement {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="category">Categoria *</Label>
-                <Select name="category" defaultValue={state.values?.category} required>
+                <Select name="category" defaultValue={getValue('category') as string} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona categoria" />
                   </SelectTrigger>
@@ -167,7 +229,7 @@ export function EventForm(): React.ReactElement {
 
               <div className="space-y-2">
                 <Label htmlFor="status">Estado *</Label>
-                <Select name="status" defaultValue={state.values?.status ?? 'publicado'}>
+                <Select name="status" defaultValue={(getValue('status') as string) ?? 'publicado'}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona estado" />
                   </SelectTrigger>
@@ -192,13 +254,24 @@ export function EventForm(): React.ReactElement {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="date">Fecha de inicio *</Label>
-                <Input id="date" name="date" type="datetime-local" defaultValue={state.values?.date} required />
+                <Input
+                  id="date"
+                  name="date"
+                  type="datetime-local"
+                  defaultValue={getValue('date') as string}
+                  required
+                />
                 <FieldError errors={state.errors?.date} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="endDate">Fecha de fin</Label>
-                <Input id="endDate" name="endDate" type="datetime-local" defaultValue={state.values?.endDate} />
+                <Input
+                  id="endDate"
+                  name="endDate"
+                  type="datetime-local"
+                  defaultValue={getValue('endDate') as string}
+                />
                 <FieldError errors={state.errors?.endDate} />
               </div>
             </div>
@@ -206,7 +279,13 @@ export function EventForm(): React.ReactElement {
             {/* Ubicacion */}
             <div className="space-y-2">
               <Label htmlFor="location">Lugar *</Label>
-              <Input id="location" name="location" placeholder="Ej: Centro de Convenciones" defaultValue={state.values?.location} required />
+              <Input
+                id="location"
+                name="location"
+                placeholder="Ej: Centro de Convenciones"
+                defaultValue={getValue('location') as string}
+                required
+              />
               <FieldError errors={state.errors?.location} />
             </div>
 
@@ -216,7 +295,7 @@ export function EventForm(): React.ReactElement {
                 id="address"
                 name="address"
                 placeholder="Ej: Calle Principal 123, 28001 Madrid"
-                defaultValue={state.values?.address}
+                defaultValue={getValue('address') as string}
                 required
               />
               <FieldError errors={state.errors?.address} />
@@ -236,7 +315,7 @@ export function EventForm(): React.ReactElement {
                   type="number"
                   min="1"
                   placeholder="100"
-                  defaultValue={state.values?.capacity}
+                  defaultValue={getValue('capacity') as string}
                   required
                 />
                 <FieldError errors={state.errors?.capacity} />
@@ -251,7 +330,7 @@ export function EventForm(): React.ReactElement {
                   min="0"
                   step="0.01"
                   placeholder="0 para eventos gratuitos"
-                  defaultValue={state.values?.price}
+                  defaultValue={getValue('price') as string}
                   required
                 />
                 <FieldError errors={state.errors?.price} />
@@ -270,14 +349,21 @@ export function EventForm(): React.ReactElement {
                 name="imageUrl"
                 type="url"
                 placeholder="https://ejemplo.com/imagen.jpg"
-                defaultValue={state.values?.imageUrl}
+                defaultValue={getValue('imageUrl') as string}
               />
               <FieldError errors={state.errors?.imageUrl} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="tags">Etiquetas (separadas por coma)</Label>
-              <Input id="tags" name="tags" placeholder="react, javascript, conferencia" defaultValue={state.values?.tags} />
+              <Input
+                id="tags"
+                name="tags"
+                placeholder="react, javascript, conferencia"
+                defaultValue={
+                  state.values?.tags ?? initialData?.tags?.join(', ')
+                }
+              />
               <p className="text-sm text-muted-foreground">Maximo 5 etiquetas</p>
               <FieldError errors={state.errors?.tags} />
             </div>
@@ -290,7 +376,13 @@ export function EventForm(): React.ReactElement {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="organizerName">Nombre del organizador *</Label>
-                <Input id="organizerName" name="organizerName" placeholder="Tu nombre o empresa" defaultValue={state.values?.organizerName} required />
+                <Input
+                  id="organizerName"
+                  name="organizerName"
+                  placeholder="Tu nombre o empresa"
+                  defaultValue={getValue('organizerName') as string}
+                  required
+                />
                 <FieldError errors={state.errors?.organizerName} />
               </div>
 
@@ -301,7 +393,7 @@ export function EventForm(): React.ReactElement {
                   name="organizerEmail"
                   type="email"
                   placeholder="contacto@ejemplo.com"
-                  defaultValue={state.values?.organizerEmail}
+                  defaultValue={getValue('organizerEmail') as string}
                   required
                 />
                 <FieldError errors={state.errors?.organizerEmail} />
@@ -310,7 +402,7 @@ export function EventForm(): React.ReactElement {
           </div>
 
           {/* Submit */}
-          <SubmitButton />
+          <SubmitButton isEditing={isEditing} />
         </form>
       </CardContent>
     </Card>

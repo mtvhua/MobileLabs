@@ -56,7 +56,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps): Pro
   const filters = {
     search: params.search,
     category: params.category as EventCategory | undefined,
-    status: (params.status as EventStatus | undefined) ?? 'publicado',
+    status: params.status as EventStatus | undefined,
     priceMax: params.priceMax ? Number(params.priceMax) : undefined,
   };
 

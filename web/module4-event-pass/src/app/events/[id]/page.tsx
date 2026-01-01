@@ -15,12 +15,14 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Calendar, MapPin, Users, Mail, Tag, ArrowLeft, Clock, User } from 'lucide-react';
+import { Calendar, MapPin, Users, Mail, Tag, ArrowLeft, Clock, User, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegisterButton } from '@/components/RegisterButton';
 import { getEventById } from '@/data/events';
+import { DeleteEventButton } from '@/components/DeleteEventButton';
+import { PublishButton } from '@/components/PublishButton';
 import { CATEGORY_LABELS, STATUS_LABELS } from '@/types/event';
 import { formatDate, formatPrice, getAvailableSpots, isEventPast } from '@/lib/utils';
 
@@ -82,12 +84,23 @@ export default async function EventDetailPage({
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Botón volver */}
-      <Button asChild variant="ghost" className="mb-6 gap-2">
-        <Link href="/events">
-          <ArrowLeft className="h-4 w-4" />
-          Volver a eventos
-        </Link>
-      </Button>
+      <div className="flex items-center justify-between mb-6">
+        <Button asChild variant="ghost" className="gap-2">
+          <Link href="/events">
+            <ArrowLeft className="h-4 w-4" />
+            Volver a eventos
+          </Link>
+        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href={`/events/${event.id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Link>
+          </Button>
+          <DeleteEventButton eventId={event.id} />
+        </div>
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Contenido principal */}
@@ -120,6 +133,11 @@ export default async function EventDetailPage({
               >
                 {STATUS_LABELS[event.status]}
               </Badge>
+              {event.status === 'borrador' && (
+                <div className="ml-2">
+                  <PublishButton eventId={event.id} />
+                </div>
+              )}
               {isPast && <Badge variant="secondary">Finalizado</Badge>}
             </div>
             <h1 className="text-3xl font-bold md:text-4xl">{event.title}</h1>
@@ -221,7 +239,7 @@ export default async function EventDetailPage({
                     <p className="text-sm text-muted-foreground">
                       {Math.round(
                         (new Date(event.endDate).getTime() - new Date(event.date).getTime()) /
-                          (1000 * 60 * 60)
+                        (1000 * 60 * 60)
                       )}{' '}
                       horas
                     </p>

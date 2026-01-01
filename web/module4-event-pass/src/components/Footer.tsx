@@ -22,7 +22,7 @@ export function Footer(): React.ReactElement {
 
           {/* Copyright */}
           <p className="text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} EventPass. Proyecto educativo creado con Next.js 15.
+            © {new Date().getFullYear()} EventPass. Proyecto educativo creado con Next.js 16.
           </p>
 
           {/* Links */}

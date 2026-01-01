@@ -75,6 +75,14 @@ export async function createEventAction(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
+  // ===========================================================================
+  // EDUCATIONAL NOTE: Server Actions
+  // ===========================================================================
+  // This function runs entirely on the SERVER. Access to databases, secrets,
+  // and internal APIs is safe here.
+  // We receive `formData` directly from the HTML form submission.
+  // ===========================================================================
+
   // Extraemos valores crudos para preservar en caso de error
   const formValues: FormValues = {
     title: formData.get('title') as string,
@@ -139,13 +147,15 @@ export async function createEventAction(
   // Creamos el evento en la "base de datos"
   const event = await createEventInDb(validationResult.data);
 
-  // Revalidamos la caché de la página de eventos
-  // Esto fuerza a Next.js a regenerar las páginas que muestran eventos
+  // Revalidamos la caché
   revalidatePath('/events');
   revalidatePath('/');
 
-  // Redirigimos al detalle del evento creado
-  redirect(`/events/${event.id}`);
+  return {
+    success: true,
+    message: 'Evento creado correctamente',
+    data: event, // Pasamos el evento para saber su ID
+  };
 }
 
 // =============================================================================
@@ -282,7 +292,10 @@ export async function deleteEventAction(id: string): Promise<FormState> {
   revalidatePath('/events');
   revalidatePath('/');
 
-  redirect('/events');
+  return {
+    success: true,
+    message: 'Evento eliminado correctamente',
+  };
 }
 
 // =============================================================================
