@@ -5,8 +5,8 @@ paginate: true
 backgroundColor: #fff
 style: |
   section { font-family: 'Inter', sans-serif; }
-  h1 { color: #2E7D32; }
-  h2 { color: #1B5E20; }
+  h1 { color: #1A477B; }
+  h2 { color: #000000; }
   code { background-color: #f0f0f0; padding: 0.2em; border-radius: 4px; }
   pre { background-color: #f5f5f5; border-radius: 8px; }
   .center { text-align: center; }

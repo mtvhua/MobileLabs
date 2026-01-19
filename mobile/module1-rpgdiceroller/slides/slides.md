@@ -5,12 +5,13 @@ paginate: true
 backgroundColor: #fff
 style: |
   section { font-family: 'Inter', sans-serif; }
-  h1 { color: #2E7D32; }
-  h2 { color: #1B5E20; }
+  h1 { color: #1A477B; }
+  h2 { color: #000000; }
   code { background-color: #f0f0f0; padding: 0.2em; border-radius: 4px; }
   pre { background-color: #f5f5f5; border-radius: 8px; }
   .center { text-align: center; }
   .small { font-size: 0.8em; }
+  th, td { font-size: 0.9em; }
 ---
 
 <!-- _class: lead -->
@@ -47,10 +48,8 @@ We are building a Digital D20 for RPG games.
 ![height:600px](assets/app_screenshot.png)
 
 ---
-
-
 <!-- _class: lead -->
-# 2. Kotlin & Coroutines
+# 1. Kotlin & Coroutines
 
 ---
 
@@ -149,20 +148,7 @@ val randomValue = (1..20).random()
 
 The magic happens when the thread is **freed**.
 
-```text
-[Main Thread]        [Coroutine]        [Network/Disk]
-      |                   |                   |
-      | --- Launch -----> |                   |
-      |                   | -- Request Data ->|
-      | <--- SUSPEND ---- |                   |
-      |                   |                   |
-(Drawing UI)              |                   |
-      |                   | <--- Data Ready --|
-      | <---- RESUME ---- |                   |
-      |                   |                   |
-      | <--- Show Data -- |                   |
-      v                   v                   v
-```
+![height:500px](assets/diag1.jpg)
 
 ---
 
@@ -211,6 +197,14 @@ Coroutines need a thread to run on. **Dispatchers** decide which thread.
 3.  **`Dispatchers.Default`**:
     *   **Use for**: Heavy CPU calculations (Image processing, algorithms).
 
+
+---
+
+## Core Android Components
+
+*   **Activity**: The "window" that hosts your UI and manages its lifecycle.
+*   **Fragment**: A controller that manages a piece of the UI, built using XML layouts. It has a complex lifecycle tied to an Activity.
+*   **Composable**: A pure, stateless UI function that *describes* a piece of UI. It is not a controller and has a much simpler lifecycle managed entirely by the Compose runtime.
 
 ---
 
@@ -285,10 +279,22 @@ fun rollDice() {
     }
     ```
 
+---
+
+## Resources Kotlin & Coroutines
+
+Want to learn more?
+
+*   [Kotlin Docs: Coroutines Guide](https://kotlinlang.org/docs/coroutines-guide.html) - The oficial Bible
+*   [Android Developers: Kotlin Coroutines](https://developer.android.com/kotlin/coroutines) - Best practices for Android
+*   [Kotlin Playground](https://play.kotlinlang.org/) - Try code in your browser
+*   [Codelab: Use Coroutines](https://developer.android.com/codelabs/kotlin-coroutines-intro) - Hands-on practice
+*   [Flow Documentation](https://kotlinlang.org/docs/flow.html) - Reactive streams
 
 
+---
 <!-- _class: lead -->
-# 3. Android
+# 2. Android
 
 ---
 
@@ -334,7 +340,7 @@ dependencies {
 
 ---
 
-## MainActivity: The Entry Point
+## Main Activity: The Entry Point
 
 In modern Compose apps, the `Activity` is simply the **Container** for your Composables.
 
@@ -377,11 +383,12 @@ The OS manages the app process. It's not just "Open" or "Closed".
 
 **Logcat** is your window into the app's soul.
 
-**Log Levels:**
-*   `Log.e` (Error)
-*   `Log.w` (Warning)
-*   `Log.i` (Info)
+**Log Levels (Lowest to Highest Priority):**
+*   `Log.v` (Verbose)
 *   `Log.d` (Debug) -> **Most used for development**
+*   `Log.i` (Info)
+*   `Log.w` (Warning)
+*   `Log.e` (Error)
 
 ```kotlin
 // Code Sample
@@ -389,10 +396,18 @@ private const val TAG = "MainActivity"
 Log.d(TAG, "onCreate: Edge-to-Edge enabled")
 ```
 
+---
+## Resources: Android Framework
 
+*   [The Activity Lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle) - Detailed diagrams
+*   [Analyze with Logcat](https://developer.android.com/studio/debug/logcat) - Master the logs
+*   [Guide to App Architecture](https://developer.android.com/topic/architecture) - How to structure apps
+*   [Android Studio Debugging](https://developer.android.com/studio/debug) - Breakpoints and inspectors
+*   [Codelab: Android Basics](https://developer.android.com/courses/android-basics-compose/course) - Full course
 
+---
 <!-- _class: lead -->
-# 4. Compose UI Basics
+# 3. Compose UI Basics
 
 ---
 
@@ -509,32 +524,25 @@ Box(
 *   `.fillMaxWidth()` / `.fillMaxSize()`
 *   `.clickable { ... }`
 
+---
 
+## Resources: Jetpack Compose
+*   [Compose Layouts Basics](https://developer.android.com/jetpack/compose/layouts) - Columns, Rows, Boxes
+*   [Thinking in Compose](https://developer.android.com/jetpack/compose/mental-model) - Shift your mindset
+*   [List of Compose Modifiers](https://developer.android.com/jetpack/compose/modifiers-list) - Cheatsheet
+*   [State in Compose](https://developer.android.com/jetpack/compose/state) - Deep dive on `remember`
+*   [Codelab: Jetpack Compose Basics](https://developer.android.com/codelabs/jetpack-compose-basics) - *Start here* Codelab
 
-
+---
 <!-- _class: lead -->
-# 5. Deep Dive
+# 4. Deep Dive
 
 ---
 
 
 ## 1. The "Roll" Flow Diagram
 
-```text
-  [User]          [Compose UI]        [Coroutine]         [State]
-    |                  |                   |                 |
-    | -- Click Roll -> |                   |                 |
-    |                  | --- Launch -----> |                 |
-    |                  |                   |                 |
-    |                  |          (Loop 15 Times)        |
-    |                  |                   |                 |
-    |                  |                   | -- Update ----> |
-    |                  | <--- Recompose -- |                 |
-    |                  |                   | - delay(80ms) - |
-    |                  |                   |                 |
-    |                  |                   | -- Final Val -> |
-    v                  v                   v                 v
-```
+![height:500px](assets/diag2.jpg)
 
 ---
 
@@ -599,7 +607,7 @@ The **Kotlin Compiler** rewrites your code.
 ---
 
 <!-- _class: lead -->
-# 6. Challenge Lab
+# 5. Challenge Lab
 ## Practice & Application
 
 ---
@@ -611,7 +619,7 @@ Transform the Dice Roller into a Character Creation Screen for a D&D-style app. 
 
 **Your Task:**
 Build a character sheet that:
-- Displays 3 stat rows (Strength, Dexterity, Intelligence)
+- Displays 3 stat rows (Vitality, Dexterity, Wisdom)
 - Each row has a label, value display, and individual "Roll" button
 - Shows total score at the bottom
 - Provides feedback based on total (< 30 = bad, >= 50 = godlike)
@@ -621,17 +629,41 @@ Build a character sheet that:
 
 ---
 
-## Part 1: Definition of Done
+## Part 1: Requirements
 
-| Criteria | Description |
-|----------|-------------|
-| StatRow Composable | Reusable `StatRow(name, value, onRoll)` function exists |
-| Three stats visible | STR, DEX, INT rows displayed with values |
-| Individual rolls | Each stat has its own Roll button that only affects that stat |
-| State hoisting | Parent screen owns all 3 state variables |
-| Total calculated | Sum of all stats shown at bottom |
-| Conditional styling | Total < 30 shows red warning, >= 50 shows gold "Godlike!" |
-| Animation works | Rolling animation applies to individual stat being rolled |
+1.  **Three Stat Rows**:
+    *   Instead of one big number, create 3 rows (Str, Dex, Int).
+    *   Each row has a Label ("STR"), a Value ("14"), and a "Roll" button.
+2.  **Total Score**:
+    *   Display the **Sum** of all 3 stats at the bottom.
+3.  **Validation Rule (Logic)**:
+    *   If the Total < 30, show a "Re-roll recommended!" message in Red.
+    *   If Total >= 50, show "Godlike!" in Gold.
+4.  **Visual Polish**:
+    *   Use `Card` or `Row` to make the stat lines look professional.
+    *   Add logical padding.
+
+---
+
+## Part 1: Step Playbook
+
+**Step 1: Refactor (Applied Layouts)**
+*   Create a reusable Composable function:
+    ```kotlin
+    @Composable
+    fun StatRow(name: String, value: Int, onRoll: () -> Unit) { ... }
+    ```
+
+**Step 2: State Management (Hoisting)**
+*   Lift the state up to the parent screen.
+    ```kotlin
+    var vit by remember { mutableIntStateOf(10) }
+    var dex by remember { mutableIntStateOf(10) }
+    ...
+    ```
+
+**Step 3: Logic**
+*   Calculate `val total = vit + dex + wis` inside parent and pass it to a footer text.
 
 ---
 
@@ -652,6 +684,24 @@ Build a traffic light that:
 
 ---
 
+## Part 2: Logic
+
+```kotlin
+LaunchedEffect(Unit) { // Runs ONCE when app starts
+    while(true) { // Infinite Loop
+        state = Red
+        delay(2000)
+        state = Green
+        delay(2000)
+        state = Yellow
+        delay(1000)
+    }
+}
+```
+
+
+---
+
 ## Part 2: Definition of Done
 
 | Criteria | Description |
@@ -665,37 +715,9 @@ Build a traffic light that:
 | Clean UI | Centered on screen with proper spacing |
 
 
+---
 <!-- _class: lead -->
-# Resources & Wrap-up
-
----
-
-## Resources
-
-**Kotlin & Coroutines**
-*   [Kotlin Docs: Coroutines Guide](https://kotlinlang.org/docs/coroutines-guide.html)
-*   [Android Developers: Kotlin Coroutines](https://developer.android.com/kotlin/coroutines)
-*   [Kotlin Playground](https://play.kotlinlang.org/)
-*   [Codelab: Use Coroutines](https://developer.android.com/codelabs/kotlin-coroutines-intro)
-*   [Flow Documentation](https://kotlinlang.org/docs/flow.html)
-
-**Android Framework**
-*   [The Activity Lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle)
-*   [Analyze with Logcat](https://developer.android.com/studio/debug/logcat)
-*   [Guide to App Architecture](https://developer.android.com/topic/architecture)
-*   [Android Studio Debugging](https://developer.android.com/studio/debug)
-*   [Codelab: Android Basics](https://developer.android.com/courses/android-basics-compose/course)
-
-**Jetpack Compose**
-*   [Compose Layouts Basics](https://developer.android.com/jetpack/compose/layouts)
-*   [Thinking in Compose](https://developer.android.com/jetpack/compose/mental-model)
-*   [List of Compose Modifiers](https://developer.android.com/jetpack/compose/modifiers-list)
-*   [State in Compose](https://developer.android.com/jetpack/compose/state)
-*   [Codelab: Jetpack Compose Basics](https://developer.android.com/codelabs/jetpack-compose-basics)
-
----
-
-## Recommended Articles
+# Recommended Articles
 
 **Kotlin & Coroutines**
 *   [The Silent Killer: Coroutine Cancellation](https://medium.com/androiddevelopers/coroutines-first-things-first-e6187bf3bb21) - Android Developers

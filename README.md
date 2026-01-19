@@ -11,13 +11,13 @@ El contenido está dividido en dos grandes áreas:
 
 Desarrollo de aplicaciones nativas modernas con Kotlin y Jetpack Compose.
 
-| Módulo | Proyecto | Temas |
-|--------|----------|-------|
-| 1 | [RPG Dice Roller](mobile/module1-rpgdiceroller/README.md) | Kotlin, Coroutines, Compose Básico |
-| 2 | [Stream UI](mobile/module2-streamui/README.md) | Navegación, MVVM, Inyección de Dependencias |
-| 3 | [Amiibo Vault](mobile/module3-amiibovault/README.md) | Room, Retrofit, Arquitectura Offline-First |
-| 4 | [City Spots](mobile/module4-cityspots/README.md) | Google Maps, Localización, Permisos |
-| 5 | [AI Chef](mobile/module5-aichef/README.md) | Firebase, IA Generativa (Gemini) |
+| Módulo | Proyecto | Temas | Materials |
+|--------|----------|-------|-------|
+| 1 | [RPG Dice Roller](mobile/module1-rpgdiceroller/README.md) | Kotlin, Coroutines, Compose Básico | [slides](mobile/module1-rpgdiceroller/slides/slides.pdf) |
+| 2 | [Stream UI](mobile/module2-streamui/README.md) | Navegación, MVVM, Inyección de Dependencias | [slides](mobile/module2-streamui/slides/slides.pdf) |
+| 3 | [Amiibo Vault](mobile/module3-amiibovault/README.md) | Room, Retrofit, Arquitectura Offline-First | [slides](mobile/module3-amiibovault/slides/slides.pdf) |
+| 4 | [City Spots](mobile/module4-cityspots/README.md) | Google Maps, Localización, Permisos | [slides](mobile/module4-cityspots/slides/slides.pdf) |
+| 5 | [AI Chef](mobile/module5-aichef/README.md) | Firebase, IA Generativa (Gemini) | [slides](mobile/module5-aichef/slides/slides.md) |
 
 📖 [Ver documentación completa del track Mobile](mobile/README.md)
 
