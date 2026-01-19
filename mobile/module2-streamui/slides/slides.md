@@ -5,12 +5,14 @@ paginate: true
 backgroundColor: #fff
 style: |
   section { font-family: 'Inter', sans-serif; }
-  h1 { color: #2E7D32; }
-  h2 { color: #1B5E20; }
+  h1 { color: #1A477B; }
+  h2 { color: #000000; }
   code { background-color: #f0f0f0; padding: 0.2em; border-radius: 4px; }
   pre { background-color: #f5f5f5; border-radius: 8px; }
   .center { text-align: center; }
   .small { font-size: 0.8em; }
+  th, td { font-size: 0.8em; }
+
 ---
 
 <!-- _class: lead -->
@@ -32,11 +34,24 @@ style: |
 
 ---
 
-## StreamUI App
+## 1. StreamUI App
 
-![w:220px](../assets/screenshot_3.png) ![w:220px](../assets/screenshot_1.png) ![w:220px](../assets/screenshot_2.png)
-
-(Home | Search | Player)
+<table align="center" cellpadding="20">
+  <tr>
+    <td align="center">
+      <img src="../assets/screenshot_3.png" width="220px">
+      <h3>Home</h3>
+    </td>
+    <td align="center">
+      <img src="../assets/screenshot_1.png" width="220px">
+      <h3>Search</h3>
+    </td>
+    <td align="center">
+      <img src="../assets/screenshot_2.png" width="220px">
+      <h3>Player</h3>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -191,8 +206,17 @@ MainActivity
             └── HighlightsRoute (New!)
 ```
 
+---
+
+## Resources: Navigation
+1.  [**Official Guide: Type Safety in Kotlin DSL**](https://developer.android.com/guide/navigation/design/type-safety)
+2.  [**Now in Android: Navigation Compose**](https://github.com/android/nowinandroid/tree/main/feature/search)
+3.  [**Kotlin Serialization Setup**](https://kotlinlang.org/docs/serialization.html#setup)
+4.  [**Codelab: Navigation in Jetpack Compose**](https://developer.android.com/codelabs/jetpack-compose-navigation)
+5.  [**Medium: Migrating to Type-Safe Navigation**](https://medium.com/androiddevelopers/navigation-compose-type-safety-f50f28325041)
 
 
+---
 
 <!-- _class: lead -->
 
@@ -213,8 +237,8 @@ MainActivity
 
 ```text
     ┌──────────────┐         ┌───────────────┐         ┌──────────────┐
-    │  View (UI)   │ ──────▶ │   ViewModel   │ ──────▶ │ Model (Data) │
-    │              │ ◀────── │               │ ◀────── │              │
+    │  View (UI)   │ ──────> │   ViewModel   │ ──────> │ Model (Data) │
+    │              │ <────── │               │ <────── │              │
     └──────────────┘         └───────────────┘         └──────────────┘
       (Events/State)          (Request/Data)
 ```
@@ -306,10 +330,10 @@ The UI *never* changes the state directly. It asks the ViewModel to do it.
 
 ```text
     ┌─────────────────┐             ┌─────────────────┐
-    │       UI        │ ◀────────── │    ViewModel    │
+    │       UI        │ <────────── │    ViewModel    │
     │  (HomeScreen)   │    STATE    │ (HomeViewModel) │
     └─────────────────┘             └─────────────────┘
-             │                               ▲
+             │                               ^
              │                               │
              │            EVENT              │
              └───────────────────────────────┘
@@ -369,7 +393,16 @@ fun HomeScreen(viewModel: HomeViewModel = koinViewModel()) {
 }
 ```
 
+---
 
+## Resources: MVVM & UDF
+1.  [**Guide to App Architecture**](https://developer.android.com/topic/architecture)
+2.  [**State Holder Pattern**](https://developer.android.com/topic/architecture/ui-layer/stateholders)
+3.  [**Unidirectional Data Flow in Compose**](https://developer.android.com/develop/ui/compose/architecture#udf)
+4.  [**ViewModel Overview**](https://developer.android.com/topic/libraries/architecture/viewmodel)
+5.  [**Codelab: State in Jetpack Compose**](https://developer.android.com/codelabs/jetpack-compose-state)
+
+---
 
 
 <!-- _class: lead -->
@@ -442,26 +475,6 @@ Both ViewModels share the **same** Repository instance
 
 ---
 
-## Dependency Graph
-
-Both ViewModels share the **same** Repository instance
-
-```text
-+-----------------------+
-|      Koin Module      |
-| [MockMusicRepository] |
-+-----------+-----------+
-            |
-            | Injected into
-            v
-+-----------+-----------+
-|       Consumers       |
-| [HomeVM]   [SearchVM] |
-+-----------------------+
-```
-
----
-
 ## The Module
 
 ```kotlin
@@ -501,10 +514,19 @@ fun HomeScreen(
 }
 ```
 
+---
+
+## Resources: Dependency Injection (Koin)
+1.  [**Koin Official Docs for Android**](https://insert-koin.io/docs/quickstart/android)
+2.  [**Koin with Jetpack Compose**](https://insert-koin.io/docs/reference/koin-android/compose)
+3.  [**Manual Dependency Injection**](https://developer.android.com/training/dependency-injection/manual)
+4.  [**Hilt vs Koin**](https://medium.com/android-news/hilt-vs-koin-dependency-injection-frameworks-for-android-69375543c7b8)
+5.  [**Video: DI in a Nutshell**](https://www.youtube.com/watch?v=eH9UrciQqYA)
+
+---
 
 
 <!-- _class: lead -->
-
 # 5. Deep Dive
 
 
@@ -638,6 +660,10 @@ Implement a favorites system that:
 - Propagates the event from UI → ViewModel → Repository
 - Demonstrates why child Composables shouldn't own state
 
+
+---
+
+## Part 1: Song Favorites
 **Files to Modify:**
 - `data/model/Models.kt` (Song data class)
 - `ui/components/SongCard.kt`
@@ -672,6 +698,10 @@ Implement navigation that:
 - Implements bottom navigation with Home and Highlights tabs
 - Shares state between screens (favorites sync in real-time)
 
+---
+
+## Part 2: Highlights Screen with Bottom Navigation
+
 **Files to Modify/Create:**
 - `ui/navigation/Destinations.kt`
 - Create `ui/screens/HighlightsScreen.kt`
@@ -683,45 +713,17 @@ Implement navigation that:
 
 | Criteria | Description |
 |----------|-------------|
-| Route exists | `HighlightsDestination` defined with @Serializable |
+| Route exists | `HighlightsDestination` defined in `Destinations.kt` |
 | Screen created | `HighlightsScreen.kt` displays filtered favorites |
 | Bottom nav visible | `NavigationBar` with 2 `NavigationBarItem` |
 | Tab switching works | Tapping tabs navigates between screens |
-| Icons correct | Home icon for Home, Star icon for Highlights |
+| Correct Icons | Home icon for Home, Star icon for Highlights |
 | State shared | Favoriting on Home reflects on Highlights immediately |
 | Current tab highlighted | Active tab visually distinguished |
 
 
+---
 <!-- _class: lead -->
-# Resources & Wrap-up
-
----
-
-## Resources
-
-**Navigation**
-1.  [**Official Guide: Type Safety in Kotlin DSL**](https://developer.android.com/guide/navigation/design/type-safety)
-2.  [**Now in Android: Navigation Compose**](https://github.com/android/nowinandroid/tree/main/feature/search)
-3.  [**Kotlin Serialization Setup**](https://kotlinlang.org/docs/serialization.html#setup)
-4.  [**Codelab: Navigation in Jetpack Compose**](https://developer.android.com/codelabs/jetpack-compose-navigation)
-5.  [**Medium: Migrating to Type-Safe Navigation**](https://medium.com/androiddevelopers/navigation-compose-type-safety-f50f28325041)
-
-**MVVM & UDF**
-1.  [**Guide to App Architecture**](https://developer.android.com/topic/architecture)
-2.  [**State Holder Pattern**](https://developer.android.com/topic/architecture/ui-layer/stateholders)
-3.  [**Unidirectional Data Flow in Compose**](https://developer.android.com/develop/ui/compose/architecture#udf)
-4.  [**ViewModel Overview**](https://developer.android.com/topic/libraries/architecture/viewmodel)
-5.  [**Codelab: State in Jetpack Compose**](https://developer.android.com/codelabs/jetpack-compose-state)
-
-**Dependency Injection (Koin)**
-1.  [**Koin Official Docs for Android**](https://insert-koin.io/docs/quickstart/android)
-2.  [**Koin with Jetpack Compose**](https://insert-koin.io/docs/reference/koin-android/compose)
-3.  [**Manual Dependency Injection**](https://developer.android.com/training/dependency-injection/manual)
-4.  [**Hilt vs Koin**](https://medium.com/android-news/hilt-vs-koin-dependency-injection-frameworks-for-android-69375543c7b8)
-5.  [**Video: DI in a Nutshell**](https://www.youtube.com/watch?v=eH9UrciQqYA)
-
----
-
 ## Recommended Articles
 
 **Architecture & MVVM**
