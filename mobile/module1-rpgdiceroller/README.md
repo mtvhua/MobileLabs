@@ -9,7 +9,7 @@ Dice Roller App for DnD
 
 Traffic Light App
 *LINK DEL REPO >>* https://github.com/mtvhua/TrafficLight 
-- Logica de while True para que siemore funcione el semaforo
+- Logica de while True para que siempre funcione el semaforo
 - Diseño del semaforo con rojo, amarillo, verde y gris
 - Centrado para mayor visualizacion
 - Video explicativo del codigo y la app funcionando: https://youtu.be/jiuzU_ah_Xc
